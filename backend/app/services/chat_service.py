@@ -43,11 +43,15 @@ MAX_RETRIES = 3     # Gemini call attempts before giving up
 RETRY_BASE_S = 1.5  # seconds — doubles on each retry
 
 SYSTEM_PROMPT = """You are AssistFlow, an AI support assistant for call center agents.
-Your job is to help agents resolve issues quickly using the company's Standard Operating Procedures (SOPs) and troubleshooting guides provided in the context below.
+Your primary role is to help agents resolve issues quickly. You have two sources of knowledge:
+1. Company-specific context: SOPs, troubleshooting guides, and error logs provided below.
+2. General knowledge: your broader understanding of IT, software, communication, and customer service.
 
 Rules:
-- Base your answer primarily on the provided context. You may use general IT knowledge only to clarify or supplement the context.
+- If the provided context contains relevant information, use it as the primary basis for your answer.
+- If the context is not relevant or is empty, answer using your general knowledge — do not refuse or ask the agent to escalate just because the SOP context is missing.
 - Keep responses concise and actionable. Avoid filler phrases.
+- You may answer general questions (e.g. "what does HTTP 403 mean?", "how do I do a warm transfer?", "explain what VPN is") using your general knowledge even with no context match.
 
 When to ask a clarifying question:
 - If the agent's query is vague and the answer would differ significantly depending on more details, ask ONE short, specific question before giving steps.
@@ -62,8 +66,7 @@ When to ask a clarifying question:
 
 When giving resolution steps:
 - Format your response as clear, numbered step-by-step instructions.
-- If the context contains relevant information, use it — even if the match is partial.
-- If the context contains absolutely no relevant information at all, say: "I couldn't find a matching procedure. Please escalate to your supervisor."
+- Only say "I couldn't find a matching procedure. Please escalate to your supervisor." if the query is so specific to internal company systems that no general guidance is possible.
 """
 
 
@@ -280,19 +283,24 @@ class ChatService:
         Query the local SQLite offline cache for a pre-saved protocol.
         Returns the best match or None if the DB doesn't exist / no match found.
         Runs synchronously — always call via asyncio.to_thread().
+
+        Scoring: splits the query into keywords (length >= 2) and counts how many
+        appear in each stored question. Returns the highest-scoring row only if at
+        least one keyword matched, making it tolerant of short but meaningful terms
+        like "crm", "sso", "vpn", "log", etc.
         """
         db_path = Path(OFFLINE_DB_PATH)
         if not db_path.exists():
-            logger.info("Offline DB not found at %s.", db_path)
+            logger.warning("Offline DB not found at %s.", db_path)
             return None
 
         try:
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
 
-            # Split the query into keywords and score each row by how many match.
-            # Returns the highest-scoring row, falling back to any partial match.
-            keywords = [w for w in query.lower().split() if len(w) > 3]
+            # Keep words of 2+ chars so short but meaningful terms like
+            # "crm", "sso", "vpn", "no", "on" are included in the search.
+            keywords = [w for w in query.lower().split() if len(w) >= 2]
             if not keywords:
                 conn.close()
                 return None
@@ -301,10 +309,15 @@ class ChatService:
             rows = cursor.fetchall()
             conn.close()
 
+            if not rows:
+                logger.warning("Offline DB exists but has no rows.")
+                return None
+
             best_answer = None
             best_score = 0
             for question, answer in rows:
                 q_lower = question.lower()
+                # Score = number of query keywords found anywhere in the stored question
                 score = sum(1 for kw in keywords if kw in q_lower)
                 if score > best_score:
                     best_score = score
@@ -312,10 +325,12 @@ class ChatService:
 
             if best_answer and best_score >= 1:
                 logger.info(
-                    "Offline cache hit (score=%d) for query: %r", best_score, query[:60]
+                    "Offline cache hit (score=%d, keywords=%s) for query: %r",
+                    best_score, keywords[:5], query[:60],
                 )
                 return best_answer
 
+            logger.info("Offline cache: no match found for query: %r", query[:60])
             return None
         except Exception as exc:
             logger.error("Offline cache query failed: %s", exc)
