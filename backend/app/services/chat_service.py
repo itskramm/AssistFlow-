@@ -67,9 +67,9 @@ class ChatService:
             google_api_key=GEMINI_API_KEY,
         )
 
-        # Gemini 3.8 Flash for generation
+        # Gemini 3.1 Flash Lite for generation
         self._llm = ChatGoogleGenerativeAI(
-            model="gemini-3.8-flash",
+            model="gemini-3.1-flash-lite",
             google_api_key=GEMINI_API_KEY,
             temperature=0.2,
         )

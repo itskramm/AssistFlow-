@@ -5,7 +5,7 @@
 // Config
 // ─────────────────────────────────────────────────────────────
 const BACKEND          = 'http://127.0.0.1:8000';
-const MODEL_GENERATION = 'gemini-3.8-flash';
+const MODEL_GENERATION = 'gemini-3.1-flash-lite';
 const MODEL_EMBEDDING  = 'gemini-embedding-001';
 const CRM_DOMAINS = [
   'salesforce.com','lightning.force.com','zendesk.com','freshdesk.com',
