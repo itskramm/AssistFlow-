@@ -1,8 +1,13 @@
 # AssistFlow — AI-Assisted Workplace Support System
 
-A thesis project: *"Design and Development of an AI-Assisted Workplace Support System for Improving Workflow Efficiency and System Usability."*
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
+[![Chrome Extension](https://img.shields.io/badge/chrome-extension-orange.svg)](https://developer.chrome.com/docs/extensions/)
 
-AssistFlow is a Chrome side-panel extension that gives call center agents real-time, AI-powered guidance without leaving their CRM or dialer. It uses Retrieval-Augmented Generation (RAG) to ground every answer in your actual internal SOPs, and falls back to a bundled local FAQ instantly when the network or backend is unavailable — no internet required, no extra setup.
+> **Thesis Project:** *"Design and Development of an AI-Assisted Workplace Support System for Improving Workflow Efficiency and System Usability"*
+
+AssistFlow is a Chrome side-panel extension that gives call center agents real-time, AI-powered guidance without leaving their CRM or dialer. It uses **Retrieval-Augmented Generation (RAG)** to ground every answer in your actual internal SOPs, and falls back to a bundled local FAQ instantly when the network or backend is unavailable — **no internet required, no extra setup**.
 
 ---
 
@@ -57,12 +62,13 @@ Chrome Extension                 Local FAQ search
 - **Right-click context menu** — "Ask AssistFlow" on any selected text across any page
 - **Numbered step rendering** — AI replies are parsed and rendered as a step-by-step `<ol>` list
 - **Source badge** — each response shows where the answer came from: "AI · SOP" or "Offline cache"
-- **Instant offline FAQ** — 35 pre-loaded procedures bundled in the extension, zero network required
+- **Instant offline FAQ** — 39 pre-loaded procedures bundled in the extension with heavy keyword loading for robust matching
 - **Clickable topic list** — when no FAQ match is found offline, all topics are shown as one-tap buttons
 - **Auto-recovery** — polls the backend silently while offline and restores online mode automatically
 - **Thumbs up / down feedback** per response, logged to the backend
 - **Dark mode** with system-preference detection and `localStorage` persistence
 - **Latency tracking** — every backend request logged with response time in ms
+- **Robust offline detection** — 5s timeout on first failure, then instant FAQ responses with zero network calls
 
 ---
 
@@ -71,6 +77,7 @@ Chrome Extension                 Local FAQ search
 ```text
 AssistFlow/
 ├── README.md
+├── TESTING.md                  ← comprehensive testing guide (backend, offline FAQ, UI)
 ├── .gitignore
 ├── module_by_module_tech_stack_breakdown.md   ← development checklist
 ├── project_guidelines_and_context.md          ← thesis context & rules
@@ -273,19 +280,70 @@ The extension handles connectivity loss automatically — no configuration neede
 | Situation | Behaviour |
 |---|---|
 | Backend reachable, internet available | Full RAG pipeline via Gemini |
-| Backend reachable, internet down | Backend probes Gemini, serves FAQ answer from its own SQLite cache |
+| Backend reachable, Gemini unreachable | Backend probes Gemini endpoint, serves answer from SQLite cache (39 protocols) |
 | Backend unreachable (first failure) | 5s timeout → marks offline → answers from local JS FAQ instantly |
 | Backend unreachable (subsequent queries) | Skips fetch entirely → local FAQ answer in < 1ms |
-| No FAQ match found | Shows a clickable list of all 35 available topics |
+| No FAQ match found | Shows a clickable list of all available topics |
 | Backend recovers | Auto-detected via 30s health poll → switches back to online mode |
 
-The local FAQ covers 35 topics across 6 categories:
-- **CRM & Login** — login failures, lockouts, SSO, permissions, session issues
-- **Telephony & Audio** — one-way audio, mic issues, call drops, echo, softphone crashes, WebRTC
-- **System Downtime** — offline workflow, backup procedures, BCP, post-downtime restoration
-- **Escalation & Tickets** — Tier 2/3 escalation, warm/cold transfer, SLA breach, ticket statuses
-- **Identity Verification** — standard 2FA, OTP, third-party callers, vulnerable customers
-- **Network & Auth** — VPN, MFA, SSL errors, Active Directory, webhooks, API errors
+### Offline Cache Coverage
+
+The system maintains **39 heavily keyword-loaded protocols** covering all 8 knowledge base documents:
+
+**CRM & Login (5 protocols)**
+- Login failures with error codes (INVALID_SESSION_ID, SSO errors, authentication failures)
+- Account lockouts after failed attempts
+- Permission denied / access control issues
+- Session expiry and token problems
+- Record locking conflicts
+
+**Telephony & Audio (7 protocols)**
+- One-way audio (agent can't hear customer / customer can't hear agent)
+- Call quality issues (choppy, robotic, packet loss, jitter)
+- Call drops and disconnections
+- Echo and feedback issues
+- Softphone crashes and recovery
+- No incoming calls / routing failures
+- WebRTC and ICE connection failures
+
+**System Downtime (4 protocols)**
+- Complete CRM unavailability and offline workflows
+- Phone system downtime procedures
+- Business continuity plan activation
+- Post-downtime system restoration
+
+**Escalation & Routing (6 protocols)**
+- Tier 2 escalation procedures
+- Tier 3 / supervisor escalation for critical issues
+- Warm transfer step-by-step
+- Cold transfer procedures
+- SLA breach handling
+- Ticket status and priority management
+
+**Identity Verification (4 protocols)**
+- Standard 2-factor authentication
+- Third-party caller verification
+- OTP and enhanced verification procedures
+- Vulnerable customer handling
+
+**Network & Authentication (6 protocols)**
+- VPN connection failures
+- MFA and 2FA issues
+- SSL certificate errors
+- Active Directory authentication
+- Webhook and API errors
+- Network timeout troubleshooting
+
+**General Issues (7 protocols)**
+- HTTP error codes (403, 404, 500, 502, 503, 504)
+- Database connection failures
+- Browser compatibility and cache clearing
+- File upload errors
+- Session timeout handling
+- Password reset procedures
+- System performance degradation
+
+Each protocol is loaded with synonyms, platform names (Salesforce, Zendesk, Genesys, etc.), error codes, and natural agent phrasings to maximize matching accuracy.
 
 To add more FAQ entries, edit `extension/sidepanel/src/offlineFaq.js` and run `npm run build`.
 
@@ -309,7 +367,7 @@ To add more FAQ entries, edit `extension/sidepanel/src/offlineFaq.js` and run `n
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/health` | Liveness check — also used by the extension's offline recovery probe |
-| `GET` | `/api/offline-status` | Reports whether the backend SQLite cache is loaded |
+| `GET` | `/api/offline-status` | Reports backend connectivity status: `{"online": true/false}` based on Gemini API reachability |
 | `POST` | `/api/chat` | Submit a query — returns a RAG-grounded reply with latency and source metadata |
 | `POST` | `/api/feedback` | Submit a thumbs up/down rating on a response |
 
@@ -342,6 +400,30 @@ The `page_context` field is optional. When present (populated automatically by t
 ```
 
 The `source` field: `"rag"` (Gemini + ChromaDB), `"offline-cache"` (backend SQLite fallback), or `"fallback"` (no match).
+
+---
+
+## Testing
+
+Comprehensive testing procedures are documented in **[TESTING.md](TESTING.md)**, including:
+
+- **Backend API tests** — health checks, chat endpoints, feedback, offline status
+- **Sample prompts** — 40+ test queries organized by category (CRM, telephony, escalation, etc.)
+- **Offline FAQ tests** — match verification, no-match handling, auto-recovery procedures
+- **Extension UI checklist** — auto-open, context menu, dark mode, ticket context display
+- **Common issues & fixes** — troubleshooting guide for typical problems
+
+To run the full test suite:
+
+```bash
+# Backend API tests (requires backend running)
+cd backend
+source .venv/bin/activate
+pytest -v
+
+# Manual testing
+# Follow procedures in TESTING.md for UI and offline mode testing
+```
 
 ---
 
@@ -405,9 +487,24 @@ cd extension/sidepanel && npm run build
 - **Offline detection** — the extension tracks connectivity in a `useRef` (no re-renders). First failure sets the flag; all subsequent queries skip the fetch entirely. A background health poll clears the flag when the backend recovers.
 - **Fetch timeout** — reduced to 5s (down from 30s) so offline is detected quickly on the first failed request without blocking the agent.
 - **Async safety** — all synchronous LangChain/ChromaDB calls on the backend are offloaded via `asyncio.to_thread()`. The FastAPI event loop is never blocked.
-- **Connectivity probe** — the backend probes `generativelanguage.googleapis.com:443` before each request. If unreachable, it skips Gemini and queries its SQLite cache directly.
+- **Connectivity probe** — the backend probes `generativelanguage.googleapis.com:443` (actual Gemini API endpoint) before each request. If unreachable, it skips Gemini and queries its SQLite cache directly.
+- **Network error detection** — comprehensive error string matching including "Name or service not known", "Temporary failure in name resolution", "nodename nor servname provided" to catch all DNS and network failures.
 - **Retry logic** — Gemini calls retry up to 3 times with exponential backoff (1.5s base) for rate-limit (429) and server errors (5xx). Network errors skip retries immediately.
 - **Idempotent ingestion** — `ingest_knowledge.py` drops and rebuilds the ChromaDB collection on every run. Safe to re-run after adding new SOPs.
+- **Keyword loading** — offline cache protocols are heavily keyword-loaded with synonyms, platform names, error codes, and natural agent phrasings to maximize matching accuracy.
 - **Content script privacy** — reads only visible text fields. Never touches password inputs, hidden fields, or cross-origin iframes, and never modifies the host CRM DOM.
 - **CORS** — set to `allow_origins=["*"]` for local development. Tighten to the extension origin before any production deployment.
 - **Feedback pipeline** — `POST /api/feedback` logs ratings to stdout. Ready to be wired into a database for fine-tuning data collection.
+
+---
+
+## Known Issues Fixed
+
+Recent bug fixes and improvements:
+
+1. **Connectivity probe** — Fixed to probe actual Gemini API endpoint (`generativelanguage.googleapis.com:443`) instead of generic DNS check
+2. **Socket timeout corruption** — Replaced `socket.setdefaulttimeout()` with per-request timeout to avoid global state corruption
+3. **Frontend status display** — Fixed to use `/api/offline-status` endpoint for accurate connectivity reporting
+4. **Network error detection** — Expanded error string matching to catch all DNS resolution failures
+5. **Offline cache expansion** — Increased from 13 to 39 protocols with comprehensive keyword loading
+6. **Auto-recovery** — Added 30s background health poll for automatic online mode restoration
