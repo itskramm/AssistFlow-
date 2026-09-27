@@ -2,76 +2,168 @@
 
 This repository contains the source code for the AI-Assisted Workplace Support System. The project is divided into distinct modules to ensure a clean, maintainable, and scalable architecture.
 
+---
+
+## Progress Legend
+- ✅ Done
+- 🔧 Scaffolded / Placeholder (code exists but not yet functional)
+- ⬜ Not started
+
+---
+
 ## Module 1: Frontend (Browser Extension)
 
 **Tech Stack:** React, Tailwind CSS, Chrome Extension Manifest V3.
-**Purpose:** Provides the "side-panel" interface for call center agents to interact with the AI without leaving their current web applications.
+**Purpose:** Side-panel interface for call center agents. Auto-activates on 18 supported CRM, ticketing, and dialer platforms without the agent leaving their workspace.
 
-* **`manifest.json`**: Configures the extension, permissions (`sidePanel`, `storage`, `activeTab`), and background scripts.
+**Files:** `extension/sidepanel/`
 
-* **Side Panel UI**: Built with React and styled with Tailwind CSS for a clean chat-like interface.
+| Task | File | Status |
+|---|---|---|
+| `manifest.json` — permissions: `sidePanel`, `storage`, `activeTab`, `tabs`, `contextMenus`, `scripting` | `public/manifest.json` | ✅ |
+| Content script rules for 18 CRM domains (Salesforce, Zendesk, Freshdesk, Genesys, Avaya, RingCentral, Talkdesk, Five9, HubSpot, ServiceNow, Intercom, Help Scout, Kustomer, Zoho…) | `public/manifest.json` | ✅ |
+| Background service worker — auto-opens panel on CRM tab activation & URL change | `public/background.js` | ✅ |
+| Background — persists tab context to `storage.session` for panel startup | `public/background.js` | ✅ |
+| Background — right-click "Ask AssistFlow" context menu | `public/background.js` | ✅ |
+| Background — `PANEL_READY` handshake pushes last context on mount | `public/background.js` | ✅ |
+| Content script — platform detection (15 CRM labels) | `src/content.js` | ✅ |
+| Content script — `PAGE_CONTEXT` on load + SPA navigation (MutationObserver) | `src/content.js` | ✅ |
+| Content script — `TEXT_SELECTED` forwarded on highlight (debounced 600ms) | `src/content.js` | ✅ |
+| React app entry point (`main.jsx`) | `src/main.jsx` | ✅ |
+| Context-aware header — shows active platform (e.g. "Active on Salesforce") | `src/App.jsx` | ✅ |
+| Selected-text banner with "Use as query" one-click action | `src/App.jsx` | ✅ |
+| Chat message rendering — user/assistant bubbles | `src/App.jsx` | ✅ |
+| Numbered step rendering — replies parsed into `<ol>` when applicable | `src/App.jsx` | ✅ |
+| Thumbs up / down feedback UI — calls `POST /api/feedback`, disabled after rating | `src/App.jsx` | ✅ |
+| Input form with send button | `src/App.jsx` | ✅ |
+| Online / Offline status pill | `src/App.jsx` | ✅ |
+| Animated loading dots | `src/App.jsx` | ✅ |
+| Auto-scroll to latest message | `src/App.jsx` | ✅ |
+| API client → `POST /api/chat` | `src/App.jsx` | ✅ |
+| Offline fallback message when backend is unreachable | `src/App.jsx` | ✅ |
+| Narrow-safe CSS (min-width 240px, slim scrollbar, truncation-safe layout) | `src/index.css` | ✅ |
+| Vite dual-entry build — side panel + `content.js` as separate stable bundle | `vite.config.js` | ✅ |
+| First production build (`npm run build`) | — | ⬜ |
+| Streaming response support | — | ⬜ |
 
-* **State Management**: React hooks to manage chat history, loading states, and offline status.
-
-* **API Client**: Communicates with the FastAPI backend to send queries and receive streaming or static responses.
+---
 
 ## Module 2: Backend API Gateway
 
 **Tech Stack:** Python, FastAPI, Uvicorn.
-**Purpose:** Acts as the central orchestrator routing frontend requests to the vector database and the Gemini API.
+**Purpose:** Central orchestrator — routes requests from the Chrome extension to ChromaDB and the Gemini API.
 
-* **Endpoints**: RESTful API endpoints (e.g., `/api/chat`, `/api/health`, `/api/feedback`).
+**Files:** `backend/`
 
-* **Asynchronous Processing**: Ensures multiple agents can query the system concurrently without lag.
+| Task | File | Status |
+|---|---|---|
+| FastAPI app with lifespan context manager | `app/main.py` | ✅ |
+| CORS middleware | `app/main.py` | ✅ |
+| `RequestLoggingMiddleware` — logs method/path/status/latency on every request | `app/api/middleware.py` | ✅ |
+| `GET /api/health` endpoint | `app/api/routes/chat.py` | ✅ |
+| `POST /api/chat` — Pydantic request validation, delegates to `ChatService` | `app/api/routes/chat.py` | ✅ |
+| `POST /api/feedback` — logs thumbs up/down ratings | `app/api/routes/chat.py` | ✅ |
+| `config.py` — loads all env vars from `.env` (`GEMINI_API_KEY`, `CHROMA_DB_PATH`, `OFFLINE_DB_PATH`, `FASTAPI_HOST`, `FASTAPI_PORT`, `LOG_LEVEL`) | `app/core/config.py` | ✅ |
+| `logging_config.py` — structured formatter, silences noisy libs | `app/core/logging_config.py` | ✅ |
+| `.env` file with Gemini API key | `.env` | ✅ |
+| `.env.example` with all keys documented | `.env.example` | ✅ |
+| `ChatService` singleton on `app.state` | `app/services/chat_service.py` | ✅ |
+| All sync I/O offloaded via `asyncio.to_thread()` — event loop never blocked | `app/services/chat_service.py` | ✅ |
+| Gemini rate-limit retry — exponential backoff, 3 attempts, 1.5s base | `app/services/chat_service.py` | ✅ |
+| Gemini 2.5 Flash integration via `ChatGoogleGenerativeAI` | `app/services/chat_service.py` | ✅ |
+| RAG pipeline wired into `/api/chat` | `app/services/chat_service.py` | ✅ |
+| SQLite offline fallback on Gemini/network failure | `app/services/chat_service.py` | ✅ |
+| `run.py` — startup script with `--host`, `--port`, `--reload`, `--log-level` flags | `run.py` | ✅ |
+| Full `pip install -r requirements.txt` in venv | — | ⬜ |
 
-* **CORS Configuration**: Allows secure communication between the Chrome extension and the local/cloud API server.
+---
 
 ## Module 3: Knowledge Base & Vector Retrieval (RAG)
 
-**Tech Stack:** ChromaDB (or Qdrant), LangChain / LlamaIndex, Google Text Embeddings.
-**Purpose:** Stores and retrieves company-specific Standard Operating Procedures (SOPs) and troubleshooting guides.
+**Tech Stack:** ChromaDB, LangChain, Google Text Embeddings (`text-embedding-004`).
+**Purpose:** Stores and retrieves company SOPs and troubleshooting guides via semantic search.
 
-* **Document Ingestion**: Scripts to parse PDFs, text files, and markdown SOPs, chunk them, and convert them into vector embeddings using Google's `text-embedding-004`.
+**Files:** `scripts/ingest_knowledge.py`, `data/knowledge/`, `data/chroma/`
 
-* **Vector Store**: ChromaDB stores these embeddings locally for fast semantic retrieval.
+| Task | File | Status |
+|---|---|---|
+| `data/knowledge/` directory | `data/knowledge/` | ✅ |
+| `ingest_knowledge.py` — loads `.md` / `.txt` docs | `scripts/ingest_knowledge.py` | ✅ |
+| Text chunking — `RecursiveCharacterTextSplitter` (800 chars / 100 overlap) | `scripts/ingest_knowledge.py` | ✅ |
+| Google `text-embedding-004` embedding via `GoogleGenerativeAIEmbeddings` | `scripts/ingest_knowledge.py` | ✅ |
+| ChromaDB `PersistentClient` — cosine similarity, stores to `data/chroma/` | `scripts/ingest_knowledge.py` | ✅ |
+| Retriever — top-4 cosine similarity search, integrated into `ChatService` | `app/services/chat_service.py` | ✅ |
+| Real SOP / procedure documents added to `data/knowledge/` (5 SOPs: login, telephony, downtime, escalation, identity verification) | `data/knowledge/` | ✅ |
+| First ingestion run (`python scripts/ingest_knowledge.py`) | — | ⬜ |
 
-* **Retriever**: Searches the database for the top-K most relevant chunks based on the agent's natural language query.
+---
 
 ## Module 4: Generative AI & Orchestration
 
 **Tech Stack:** Google Gemini API (Gemini 2.5 Flash), LangChain.
-**Purpose:** Synthesizes the retrieved SOPs and the user's query into a coherent, actionable response.
+**Purpose:** Synthesizes retrieved SOPs and the agent's query into a grounded, step-by-step response.
 
-* **Prompt Engineering**: System prompts designed to restrict the AI to *only* use retrieved context and format output as step-by-step instructions.
+**Files:** `backend/app/services/chat_service.py`
 
-* **LLM Chain**: Combines the retrieved documents and user query, sending the payload to the Gemini API.
+| Task | File | Status |
+|---|---|---|
+| `google-generativeai` + `langchain-google-genai` in `requirements.txt` | `requirements.txt` | ✅ |
+| `GEMINI_API_KEY` loaded from `.env` | `app/core/config.py` | ✅ |
+| `ChatGoogleGenerativeAI` (Gemini 2.5 Flash, temp 0.2) | `app/services/chat_service.py` | ✅ |
+| System prompt — restricts AI to retrieved context, enforces step-by-step format | `app/services/chat_service.py` | ✅ |
+| RAG chain — embed query → retrieve chunks → build prompt → call Gemini | `app/services/chat_service.py` | ✅ |
+| Response returned with `latency_ms` + `retrieved_sources` metadata | `app/services/chat_service.py` | ✅ |
+| Streaming support | — | ⬜ |
+
+---
 
 ## Module 5: Downtime & Offline Caching
 
-**Tech Stack:** SQLite or Redis.
-**Purpose:** Fulfills the objective of providing alternative workflows during system downtime.
+**Tech Stack:** SQLite (`sqlite-utils`).
+**Purpose:** Serves pre-saved offline protocols when Gemini or the network is unavailable.
 
-* **Query Caching**: Stores frequently asked questions and their verified answers.
+**Files:** `backend/app/services/chat_service.py`, `data/offline_cache/`
 
-* **Offline Fallback**: If the FastAPI server detects a loss of internet connection (cannot reach Gemini API), it queries the local SQLite database for pre-saved "offline protocols" to guide the agent.
+| Task | File | Status |
+|---|---|---|
+| `data/offline_cache/` directory | `data/offline_cache/` | ✅ |
+| `sqlite-utils` in `requirements.txt` | `requirements.txt` | ✅ |
+| `OFFLINE_DB_PATH` in `config.py` | `app/core/config.py` | ✅ |
+| Offline fallback in `ChatService` — queries SQLite on Gemini failure | `app/services/chat_service.py` | ✅ |
+| Frontend shows "Offline" status when backend is unreachable | `src/App.jsx` | ✅ |
+| SQLite DB schema (`offline_protocols` table — `question`, `answer`) | — | ⬜ |
+| Pre-populate DB with offline protocols / downtime procedures | — | ⬜ |
+
+---
 
 ## Module 6: Evaluation & Metrics
 
 **Tech Stack:** Python, Ragas Framework, Pandas.
-**Purpose:** Evaluates the technical performance of the RAG system to satisfy the thesis evaluation objectives.
+**Purpose:** Benchmarks RAG system performance for the thesis evaluation objectives.
 
-* **Logging**: Captures processing latency (time taken from query to response).
+**Files:** `scripts/evaluate_rag.py`
 
-* **Quality Metrics**: Uses the Ragas framework to score response retrieval precision, context recall, and generation accuracy.
+| Task | File | Status |
+|---|---|---|
+| `ragas` + `pandas` in `requirements.txt` | `requirements.txt` | ✅ |
+| `evaluate_rag.py` scaffolded | `scripts/evaluate_rag.py` | 🔧 |
+| Per-request latency logged via `RequestLoggingMiddleware` + `chat_service.py` | `app/api/middleware.py` | ✅ |
+| Evaluation dataset — question + ground truth pairs | — | ⬜ |
+| Ragas metrics — retrieval precision, context recall, answer accuracy | `scripts/evaluate_rag.py` | ⬜ |
+| Results exported to CSV via Pandas | `scripts/evaluate_rag.py` | ⬜ |
 
-## Recommended Development Flow
+---
 
-1. **Setup Module 3 & 4 (The Core AI):** Start by writing a python script to ingest dummy SOPs into ChromaDB and successfully generate a RAG response using the Gemini API in your terminal.
+## Remaining Steps (in order)
 
-2. **Setup Module 2 (Backend):** Wrap your working RAG script into a FastAPI application with a `/chat` endpoint.
-
-3. **Setup Module 1 (Frontend):** Build the Chrome Extension in React, set up the side panel, and connect it to your local FastAPI backend.
-
-4. **Setup Module 5 (Caching):** Add the offline SQLite fallback logic to your FastAPI backend.
-
-5. **Setup Module 6 (Evaluation):** Write testing scripts to simulate queries and log the performance metrics.
+| Step | Command / Action |
+|---|---|
+| 1. Install Python dependencies | `cd backend && pip install -r requirements.txt` |
+| 2. Add SOP documents | Drop `.md` or `.txt` files into `data/knowledge/` |
+| 3. Run knowledge ingestion | `python scripts/ingest_knowledge.py` |
+| 4. Start the backend | `cd backend && python run.py --reload` |
+| 5. Verify health endpoint | `curl http://127.0.0.1:8000/api/health` |
+| 6. Build the extension | `cd extension/sidepanel && npm run build` |
+| 7. Load in Chrome | `chrome://extensions` → Load unpacked → select `dist/` |
+| 8. Seed SQLite offline DB | Create `offline_protocols` table + insert fallback procedures |
+| 9. Run RAG evaluation | Implement + run `scripts/evaluate_rag.py` |

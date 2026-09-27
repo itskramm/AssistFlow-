@@ -1,17 +1,65 @@
 {
   "manifest_version": 3,
   "name": "AssistFlow",
-  "version": "0.1.0",
-  "description": "AI-assisted workplace support side panel for call center agents.",
-  "permissions": ["sidePanel", "storage", "activeTab"],
+  "version": "0.2.0",
+  "description": "AI-assisted workplace support side panel for call center agents. Works alongside CRM, ticketing, and dialer tools.",
+
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "activeTab",
+    "tabs",
+    "contextMenus",
+    "scripting"
+  ],
+
   "host_permissions": ["<all_urls>"],
+
   "action": {
-    "default_title": "AssistFlow"
+    "default_title": "Open AssistFlow"
   },
+
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
+
   "side_panel": {
     "default_path": "index.html"
-  }
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.salesforce.com/*",
+        "*://*.lightning.force.com/*",
+        "*://*.zendesk.com/*",
+        "*://*.freshdesk.com/*",
+        "*://*.freshworks.com/*",
+        "*://*.genesyscloud.com/*",
+        "*://*.mypurecloud.com/*",
+        "*://*.avayacloud.com/*",
+        "*://*.ringcentral.com/*",
+        "*://*.talkdesk.com/*",
+        "*://*.niceincontact.com/*",
+        "*://*.five9.com/*",
+        "*://*.hubspot.com/*",
+        "*://*.servicenow.com/*",
+        "*://*.intercom.com/*",
+        "*://*.helpscout.com/*",
+        "*://*.kustomer.com/*",
+        "*://*.zohocrm.com/*",
+        "*://*.zoho.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["*.js", "*.css", "*.png", "*.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

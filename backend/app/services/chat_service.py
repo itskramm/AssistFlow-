@@ -1,19 +1,243 @@
+"""
+chat_service.py
+---------------
+Orchestrates the full RAG pipeline:
+  1. Embeds the user query with text-embedding-004
+  2. Retrieves the top-K most relevant chunks from ChromaDB
+  3. Builds a structured prompt using the retrieved context
+  4. Calls Gemini 2.5 Flash for a grounded, step-by-step response
+  5. Falls back to the offline SQLite cache if Gemini is unreachable
+
+Async safety:
+  All synchronous LangChain / ChromaDB calls are offloaded to a thread-pool
+  executor via asyncio.to_thread() so the FastAPI event loop is never blocked,
+  allowing multiple agents to query the system concurrently without lag.
+
+Resilience:
+  Gemini API calls are wrapped in an exponential-backoff retry (3 attempts)
+  to handle transient rate-limit (429) and server errors (5xx).
+"""
+
+import asyncio
+import logging
+import sqlite3
+import time
+from pathlib import Path
+
+import chromadb
+from chromadb.config import Settings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain.schema import HumanMessage, SystemMessage
+
+from app.core.config import (
+    GEMINI_API_KEY,
+    CHROMA_DB_PATH,
+    OFFLINE_DB_PATH,
+)
+
+logger = logging.getLogger("assistflow.chat_service")
+
+COLLECTION_NAME = "assistflow_knowledge"
+TOP_K = 4           # chunks to retrieve per query
+MAX_RETRIES = 3     # Gemini call attempts before giving up
+RETRY_BASE_S = 1.5  # seconds — doubles on each retry
+
+SYSTEM_PROMPT = """You are AssistFlow, an AI support assistant for call center agents.
+Your job is to help agents resolve issues quickly using the company's Standard Operating Procedures (SOPs) and troubleshooting guides.
+
+Rules:
+- Answer ONLY using the provided context. Do not use outside knowledge.
+- Format your response as clear, numbered step-by-step instructions when applicable.
+- If the context does not contain a relevant answer, say: "I couldn't find a matching procedure. Please escalate to your supervisor."
+- Keep responses concise and actionable. Avoid filler phrases.
+"""
+
+
 class ChatService:
-    """Service layer for chat orchestration and future RAG integration."""
+    """Handles query embedding, vector retrieval, and LLM generation."""
 
-    def process_message(self, message: str) -> dict:
+    def __init__(self) -> None:
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY is not set. Check backend/.env.")
+
+        # Embedding model for query vectorisation
+        self._embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/text-embedding-004",
+            google_api_key=GEMINI_API_KEY,
+        )
+
+        # Gemini 2.5 Flash for generation
+        self._llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=GEMINI_API_KEY,
+            temperature=0.2,
+        )
+
+        # ChromaDB persistent client
+        Path(CHROMA_DB_PATH).mkdir(parents=True, exist_ok=True)
+        self._chroma = chromadb.PersistentClient(
+            path=CHROMA_DB_PATH,
+            settings=Settings(anonymized_telemetry=False),
+        )
+
+        logger.info("ChatService initialised (Gemini 2.5 Flash + ChromaDB ready)")
+
+    # ------------------------------------------------------------------
+    # Public async interface
+    # ------------------------------------------------------------------
+
+    async def process_message(self, message: str) -> dict:
+        """
+        Main entry point called by the /api/chat route.
+
+        Returns a dict with:
+          reply, status, source, latency_ms, retrieved_sources
+        """
         text = (message or "").strip()
-
         if not text:
             return {"reply": "Please provide a valid support request.", "status": "error"}
 
+        start = time.perf_counter()
+        sources: list[str] = []
+
+        try:
+            # Offload blocking I/O to the thread pool — keeps the event loop free
+            context_chunks, sources = await asyncio.to_thread(self._retrieve, text)
+            reply = await self._generate_with_retry(text, context_chunks)
+            source = "rag"
+        except Exception as exc:
+            logger.warning("RAG pipeline failed (%s). Trying offline cache.", exc)
+            reply = await asyncio.to_thread(self._offline_fallback, text)
+            source = "offline-cache"
+            if reply is None:
+                reply = (
+                    "The AI service is currently unavailable and no cached procedure "
+                    "matched your query. Please escalate to your supervisor."
+                )
+                source = "fallback"
+
+        latency_ms = round((time.perf_counter() - start) * 1000, 1)
+        logger.info(
+            "process_message done | source=%s latency_ms=%s sources=%s",
+            source, latency_ms, sources,
+        )
+
         return {
-            "reply": (
-                "I’ve received your request. Based on the current troubleshooting workflow, "
-                "check the system status, validate the active incident checklist, and escalate "
-                "if the issue persists."
-            ),
+            "reply": reply,
             "status": "ok",
-            "input": text,
-            "source": "chat-service"
+            "source": source,
+            "latency_ms": latency_ms,
+            "retrieved_sources": sources,
         }
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _retrieve(self, query: str) -> tuple[list[str], list[str]]:
+        """
+        Embed the query and retrieve the top-K chunks from ChromaDB.
+        Runs synchronously — always call via asyncio.to_thread().
+        """
+        try:
+            collection = self._chroma.get_collection(COLLECTION_NAME)
+        except Exception:
+            # Collection doesn't exist yet — knowledge base not ingested
+            logger.warning("ChromaDB collection '%s' not found. Skipping retrieval.", COLLECTION_NAME)
+            return [], []
+
+        query_vector = self._embeddings.embed_query(query)
+
+        results = collection.query(
+            query_embeddings=[query_vector],
+            n_results=min(TOP_K, collection.count()),
+            include=["documents", "metadatas"],
+        )
+
+        chunks = results["documents"][0] if results["documents"] else []
+        metadatas = results["metadatas"][0] if results["metadatas"] else []
+        sources = list({m.get("source", "unknown") for m in metadatas})
+
+        logger.debug("Retrieved %d chunks from %s sources.", len(chunks), len(sources))
+        return chunks, sources
+
+    async def _generate_with_retry(self, query: str, context_chunks: list[str]) -> str:
+        """
+        Call Gemini 2.5 Flash with exponential-backoff retry to handle
+        transient 429 (rate limit) and 5xx errors from the API.
+        """
+        last_exc: Exception | None = None
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                # _generate is synchronous (LangChain invoke) — offload it
+                return await asyncio.to_thread(self._generate, query, context_chunks)
+            except Exception as exc:
+                last_exc = exc
+                is_retryable = any(
+                    marker in str(exc).lower()
+                    for marker in ("429", "rate limit", "quota", "503", "500", "server error")
+                )
+                if not is_retryable or attempt == MAX_RETRIES:
+                    break
+                wait = RETRY_BASE_S * (2 ** (attempt - 1))
+                logger.warning(
+                    "Gemini call failed (attempt %d/%d): %s — retrying in %.1fs",
+                    attempt, MAX_RETRIES, exc, wait,
+                )
+                await asyncio.sleep(wait)
+
+        raise last_exc  # re-raise so process_message can trigger offline fallback
+
+    def _generate(self, query: str, context_chunks: list[str]) -> str:
+        """
+        Build the RAG prompt and call Gemini 2.5 Flash.
+        Runs synchronously — always call via asyncio.to_thread().
+        """
+        if context_chunks:
+            context_block = "\n\n---\n\n".join(context_chunks)
+            context_section = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_block}"
+        else:
+            context_section = (
+                "CONTEXT FROM KNOWLEDGE BASE:\n"
+                "(No relevant procedures found in the knowledge base.)"
+            )
+
+        user_content = f"{context_section}\n\nAGENT QUERY:\n{query}"
+
+        messages = [
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=user_content),
+        ]
+
+        response = self._llm.invoke(messages)
+        return response.content.strip()
+
+    def _offline_fallback(self, query: str) -> str | None:
+        """
+        Query the local SQLite offline cache for a pre-saved protocol.
+        Returns the best match or None if the DB doesn't exist / no match found.
+        Runs synchronously — always call via asyncio.to_thread().
+        """
+        db_path = Path(OFFLINE_DB_PATH)
+        if not db_path.exists():
+            logger.info("Offline DB not found at %s.", db_path)
+            return None
+
+        try:
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT answer FROM offline_protocols "
+                "WHERE LOWER(question) LIKE ? "
+                "ORDER BY rowid LIMIT 1",
+                (f"%{query.lower()[:60]}%",),
+            )
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                logger.info("Offline cache hit for query: %r", query[:60])
+            return row[0] if row else None
+        except Exception as exc:
+            logger.error("Offline cache query failed: %s", exc)
+            return None
