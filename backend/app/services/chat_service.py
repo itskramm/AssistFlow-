@@ -49,6 +49,8 @@ _NETWORK_ERRORS = (
     "connection", "network", "unreachable", "timeout", "timed out",
     "name or service not known", "failed to resolve", "getaddrinfo",
     "nodename nor servname", "errno 8", "errno 11001",
+    "no route to host", "failed to connect to all addresses",
+    "failed_precondition",
 )
 
 
@@ -58,19 +60,26 @@ def _is_network_error(exc: Exception) -> bool:
     return any(marker in msg for marker in _NETWORK_ERRORS)
 
 
-def _check_internet(host: str = "8.8.8.8", port: int = 53, timeout: float = 1.5) -> bool:
+def _check_internet(timeout: float = 3.0) -> bool:
     """
-    Fast connectivity probe: try to open a TCP socket to Google's DNS.
-    Uses an explicit per-connection timeout (NOT setdefaulttimeout, which
-    is a global mutation that can affect other sockets on the same thread).
-    Returns True if internet is reachable, False otherwise.
+    Probe reachability of the Gemini API endpoint specifically.
+    Tests HTTPS port 443 on generativelanguage.googleapis.com — the same
+    host the embedding and generation calls use — so a False result means
+    Gemini is actually unreachable, not just generic internet.
+
+    Falls back to probing google.com:443 if the primary probe fails due to
+    a DNS issue, to distinguish 'no internet at all' from 'Gemini DNS only'.
+
+    Uses an explicit per-connection timeout (NOT setdefaulttimeout).
     Runs synchronously — call via asyncio.to_thread().
     """
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+    for host in ("generativelanguage.googleapis.com", "google.com"):
+        try:
+            with socket.create_connection((host, 443), timeout=timeout):
+                return True
+        except OSError:
+            continue
+    return False
 
 SYSTEM_PROMPT = """You are AssistFlow, an AI support assistant for call center agents.
 Your primary role is to help agents resolve issues quickly. You have two sources of knowledge:
