@@ -2,11 +2,11 @@
 chat_service.py
 ---------------
 Orchestrates the full RAG pipeline:
-  1. Embeds the user query with text-embedding-004
-  2. Retrieves the top-K most relevant chunks from ChromaDB
-  3. Builds a structured prompt using the retrieved context
-  4. Calls Gemini 2.5 Flash for a grounded, step-by-step response
-  5. Falls back to the offline SQLite cache if Gemini is unreachable
+  1. Checks internet connectivity with a fast DNS probe
+  2. If online:  embeds the query → retrieves top-K chunks from ChromaDB
+                 → calls Gemini Flash for a grounded, step-by-step response
+  3. If offline: skips embedding/Gemini entirely and queries the local
+                 SQLite cache immediately — no timeouts, no retries
 
 Async safety:
   All synchronous LangChain / ChromaDB calls are offloaded to a thread-pool
@@ -14,12 +14,14 @@ Async safety:
   allowing multiple agents to query the system concurrently without lag.
 
 Resilience:
-  Gemini API calls are wrapped in an exponential-backoff retry (3 attempts)
-  to handle transient rate-limit (429) and server errors (5xx).
+  - Network errors bypass the retry loop and go straight to the offline cache.
+  - Gemini API calls retry up to 3 times (exponential backoff) for transient
+    rate-limit (429) and server errors (5xx) only.
 """
 
 import asyncio
 import logging
+import socket
 import sqlite3
 import time
 from pathlib import Path
@@ -41,6 +43,33 @@ COLLECTION_NAME = "assistflow_knowledge"
 TOP_K = 4           # chunks to retrieve per query
 MAX_RETRIES = 3     # Gemini call attempts before giving up
 RETRY_BASE_S = 1.5  # seconds — doubles on each retry
+
+# Error substrings that mean "no internet" — skip retries, go straight to offline cache
+_NETWORK_ERRORS = (
+    "connection", "network", "unreachable", "timeout", "timed out",
+    "name or service not known", "failed to resolve", "getaddrinfo",
+    "nodename nor servname", "errno 8", "errno 11001",
+)
+
+
+def _is_network_error(exc: Exception) -> bool:
+    """Return True if the exception looks like a connectivity failure."""
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _NETWORK_ERRORS)
+
+
+def _check_internet(host: str = "8.8.8.8", port: int = 53, timeout: float = 2.0) -> bool:
+    """
+    Fast connectivity probe: try to open a TCP socket to Google's DNS.
+    Returns True if internet is reachable, False otherwise.
+    Runs synchronously — call via asyncio.to_thread().
+    """
+    try:
+        socket.setdefaulttimeout(timeout)
+        with socket.create_connection((host, port)):
+            return True
+    except OSError:
+        return False
 
 SYSTEM_PROMPT = """You are AssistFlow, an AI support assistant for call center agents.
 Your primary role is to help agents resolve issues quickly. You have two sources of knowledge:
@@ -107,15 +136,18 @@ class ChatService:
         """
         Main entry point called by the /api/chat route.
 
+        Flow:
+          1. Probe internet connectivity (fast 2s DNS check).
+          2. If ONLINE:  run the full RAG pipeline (embed → retrieve → Gemini).
+                         On any network/API error, fall through to step 3.
+          3. If OFFLINE (or RAG failed): query SQLite offline cache immediately.
+          4. If cache has no match: return a clear offline message.
+
         Args:
             message:      The agent's natural-language query.
-            page_context: Optional dict of CRM ticket fields extracted from the
-                          active browser page by the content script. When present
-                          it is injected into the RAG prompt so Gemini can tailor
-                          its answer to the specific ticket the agent is viewing.
+            page_context: Optional CRM ticket fields from the content script.
 
-        Returns a dict with:
-          reply, status, source, latency_ms, retrieved_sources
+        Returns a dict with: reply, status, source, latency_ms, retrieved_sources
         """
         text = (message or "").strip()
         if not text:
@@ -124,27 +156,46 @@ class ChatService:
         start = time.perf_counter()
         sources: list[str] = []
 
-        try:
-            # Offload blocking I/O to the thread pool — keeps the event loop free
-            context_chunks, sources = await asyncio.to_thread(self._retrieve, text)
-            reply = await self._generate_with_retry(text, context_chunks, page_context)
-            source = "rag"
-        except Exception as exc:
-            logger.warning("RAG pipeline failed (%s). Trying offline cache.", exc)
-            reply = await asyncio.to_thread(self._offline_fallback, text)
-            source = "offline-cache"
-            if reply is None:
-                reply = (
-                    "The AI service is currently unavailable and no cached procedure "
-                    "matched your query. Please escalate to your supervisor."
+        # ── Step 1: connectivity probe ──────────────────────────────────────
+        is_online = await asyncio.to_thread(_check_internet)
+
+        if is_online:
+            # ── Step 2: full RAG pipeline ───────────────────────────────────
+            try:
+                context_chunks, sources = await asyncio.to_thread(self._retrieve, text)
+                reply = await self._generate_with_retry(text, context_chunks, page_context)
+                latency_ms = round((time.perf_counter() - start) * 1000, 1)
+                logger.info("process_message done | source=rag latency_ms=%s", latency_ms)
+                return {
+                    "reply": reply,
+                    "status": "ok",
+                    "source": "rag",
+                    "latency_ms": latency_ms,
+                    "retrieved_sources": sources,
+                }
+            except Exception as exc:
+                logger.warning(
+                    "RAG pipeline failed (%s: %s). Falling back to offline cache.",
+                    type(exc).__name__, exc,
                 )
-                source = "fallback"
+                # Fall through to offline cache below
+
+        else:
+            logger.info("No internet detected — skipping RAG, querying offline cache directly.")
+
+        # ── Step 3: offline cache ───────────────────────────────────────────
+        reply = await asyncio.to_thread(self._offline_fallback, text)
+        source = "offline-cache"
+
+        if reply is None:
+            reply = (
+                "I'm currently offline and couldn't find a cached procedure for your query. "
+                "Please check your connection or escalate to your supervisor."
+            )
+            source = "fallback"
 
         latency_ms = round((time.perf_counter() - start) * 1000, 1)
-        logger.info(
-            "process_message done | source=%s latency_ms=%s sources=%s",
-            source, latency_ms, sources,
-        )
+        logger.info("process_message done | source=%s latency_ms=%s", source, latency_ms)
 
         return {
             "reply": reply,
@@ -153,6 +204,22 @@ class ChatService:
             "latency_ms": latency_ms,
             "retrieved_sources": sources,
         }
+
+    def offline_query(self, query: str) -> dict:
+        """
+        Public synchronous method used by the /api/offline-query endpoint.
+        Queries SQLite directly — no network calls at all.
+        """
+        reply = self._offline_fallback(query)
+        if reply is None:
+            reply = (
+                "No cached procedure matched your query. "
+                "Please escalate to your supervisor when the system is back online."
+            )
+            source = "fallback"
+        else:
+            source = "offline-cache"
+        return {"reply": reply, "status": "ok", "source": source, "retrieved_sources": []}
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -192,17 +259,23 @@ class ChatService:
         page_context: dict | None = None,
     ) -> str:
         """
-        Call Gemini 2.5 Flash with exponential-backoff retry to handle
-        transient 429 (rate limit) and 5xx errors from the API.
+        Call Gemini with exponential-backoff retry for transient API errors.
+        Network/connectivity errors are not retried — they raise immediately
+        so process_message can fall to the offline cache without delay.
         """
         last_exc: Exception | None = None
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                # _generate is synchronous (LangChain invoke) — offload it
                 return await asyncio.to_thread(self._generate, query, context_chunks, page_context)
             except Exception as exc:
                 last_exc = exc
+
+                # Network errors: don't retry, fail fast to offline cache
+                if _is_network_error(exc):
+                    logger.warning("Network error during Gemini call — skipping retries: %s", exc)
+                    break
+
                 is_retryable = any(
                     marker in str(exc).lower()
                     for marker in ("429", "rate limit", "quota", "503", "500", "server error")
@@ -216,7 +289,7 @@ class ChatService:
                 )
                 await asyncio.sleep(wait)
 
-        raise last_exc  # re-raise so process_message can trigger offline fallback
+        raise last_exc
 
     def _generate(
         self,

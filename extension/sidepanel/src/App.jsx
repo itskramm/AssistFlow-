@@ -284,32 +284,56 @@ export default function App() {
       const data = await res.json();
 
       setMessages((prev) => [...prev, {
-        id:        Date.now() + 1,
-        sender:    'assistant',
-        text:      data.reply || 'The system responded but returned no guidance.',
-        feedback:  null,
-        source:    data.source || 'rag',
+        id:         Date.now() + 1,
+        sender:     'assistant',
+        text:       data.reply || 'The system responded but returned no guidance.',
+        feedback:   null,
+        source:     data.source || 'rag',
         latency_ms: data.latency_ms,
-        userText:  trimmed,
+        userText:   trimmed,
       }]);
       setStatus('Online');
     } catch (err) {
-      const isTimeout = err?.name === 'AbortError';
-      setMessages((prev) => [...prev, {
-        id:       Date.now() + 2,
-        sender:   'assistant',
-        text:     isTimeout
-          ? 'The request timed out — the AI is taking longer than usual. Please retry in a moment.'
-          : 'Could not reach the backend. Make sure the FastAPI server is running, then retry.',
-        feedback: null,
-        source:   'fallback',
-        userText: trimmed,
-      }]);
-      setStatus('Offline');
+      // /api/chat failed (timeout, backend unreachable, or network error).
+      // Try the offline-query endpoint as a last resort — it only reads SQLite
+      // and works even when Gemini / internet is down.
+      try {
+        const offlineRes = await fetch(`${BACKEND_URL}/api/offline-query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: trimmed }),
+        });
+        if (!offlineRes.ok) throw new Error(`HTTP ${offlineRes.status}`);
+        const offlineData = await offlineRes.json();
+
+        setMessages((prev) => [...prev, {
+          id:       Date.now() + 1,
+          sender:   'assistant',
+          text:     offlineData.reply,
+          feedback: null,
+          source:   offlineData.source || 'offline-cache',
+          userText: trimmed,
+        }]);
+        setStatus('Offline');
+      } catch {
+        // Backend is completely unreachable — nothing we can do server-side
+        const isTimeout = err?.name === 'AbortError';
+        setMessages((prev) => [...prev, {
+          id:       Date.now() + 2,
+          sender:   'assistant',
+          text:     isTimeout
+            ? 'The request timed out. Please retry in a moment.'
+            : 'Could not reach the backend. Make sure the FastAPI server is running, then retry.',
+          feedback: null,
+          source:   'fallback',
+          userText: trimmed,
+        }]);
+        setStatus('Offline');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, pageContext]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
