@@ -1,23 +1,22 @@
 /**
  * content.js — AssistFlow Page Context Extractor
  *
- * Injected into known CRM / call-center pages by the manifest content_scripts rule.
+ * Injected into known CRM / call-center pages.
  *
  * What it does:
- *  1. On load: sends the current page URL, title, and platform label to the
- *     background service worker so the side panel can display context.
- *  2. On text selection: debounces and forwards selected text so the panel
- *     can offer to use it as a query with a single click.
- *  3. Watches for SPA route changes (title MutationObserver + throttled URL
- *     observer) to stay accurate inside Salesforce Lightning, Zendesk, etc.
+ *  1. Detects which CRM platform is loaded and labels it.
+ *  2. Extracts ticket/case context from the DOM (subject, description,
+ *     status, customer name, priority) using platform-specific selectors.
+ *  3. Sends PAGE_CONTEXT (URL/title/platform) and PAGE_DATA (ticket fields)
+ *     to the background service worker so the side panel can attach them
+ *     to every AI query automatically.
+ *  4. Watches for SPA navigation to re-extract when the agent opens a
+ *     different ticket without a full page reload.
+ *  5. Forwards highlighted text via TEXT_SELECTED.
  *
- * Performance notes:
- *  - The URL observer is throttled to fire at most once every 800ms to
- *    prevent hundreds of callbacks on heavy SPAs like Salesforce.
- *  - document.body subtree observation is used for URL changes only;
- *    the title observer is a lightweight single-node watch.
- *
- * This script is entirely passive — it never modifies the host page DOM.
+ * Privacy: only reads visible text from the current page. Never reads
+ * password fields, hidden inputs, or cross-origin iframes.
+ * Never modifies the host page DOM.
  */
 
 // ---------------------------------------------------------------------------
@@ -49,7 +48,173 @@ function getPlatformLabel(hostname) {
 }
 
 // ---------------------------------------------------------------------------
-// Send page context to the background worker
+// DOM helper — safely read text from first matching selector
+// ---------------------------------------------------------------------------
+function txt(selectors) {
+  const list = Array.isArray(selectors) ? selectors : [selectors];
+  for (const sel of list) {
+    try {
+      const el = document.querySelector(sel);
+      if (el) {
+        const value = (el.value || el.textContent || el.innerText || '').trim();
+        if (value) return value.slice(0, 400); // cap at 400 chars per field
+      }
+    } catch { /* invalid selector — skip */ }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// CRM-specific DOM extractors
+// Each returns { subject, description, status, priority, customer, ticketId }
+// All fields are optional — only populated if found on the current page.
+// ---------------------------------------------------------------------------
+
+function extractZendesk() {
+  return {
+    ticketId:    txt(['[data-test-id="ticket-id"]', '.ticket-id', 'title'])?.match(/#(\d+)/)?.[1] || null,
+    subject:     txt(['[data-test-id="ticket-title-input"] input',
+                      '.ticket_title input',
+                      '#ticket-title',
+                      '.pane_header .subject']),
+    status:      txt(['[data-test-id="ticket-status-select"] button',
+                      '.select-dropdown button',
+                      '[aria-label="Status"]']),
+    priority:    txt(['[data-test-id="ticket-priority-select"] button',
+                      '[aria-label="Priority"]']),
+    customer:    txt(['[data-test-id="requester-input"] input',
+                      '.requester input',
+                      '.ticket_requester .value']),
+    description: txt(['[data-test-id="omni-log-item-composer"] .zd-comment',
+                      '.zd-comment.richtext',
+                      '.comment_body .zd-comment',
+                      '.ticket-comment .zd-comment']),
+  };
+}
+
+function extractSalesforce() {
+  return {
+    ticketId:    txt(['.recordName .uiOutputText',
+                      '.slds-page-header .slds-media__body .uiOutputText',
+                      'h1.slds-page-header__title']),
+    subject:     txt(['.slds-form-element__static',
+                      '[data-field="Subject"] .slds-form-element__static',
+                      '[data-field="Subject"] span']),
+    status:      txt(['[data-field="Status"] .slds-form-element__static',
+                      '[data-field="Status"] span',
+                      '.slds-form-element [title="Status"]']),
+    priority:    txt(['[data-field="Priority"] .slds-form-element__static',
+                      '[data-field="Priority"] span']),
+    customer:    txt(['[data-field="ContactId"] .slds-form-element__static',
+                      '[data-field="AccountId"] .slds-form-element__static']),
+    description: txt(['[data-field="Description"] .slds-form-element__static',
+                      '[data-field="Description"] span']),
+  };
+}
+
+function extractFreshdesk() {
+  return {
+    ticketId:    document.title?.match(/#(\d+)/)?.[1] || null,
+    subject:     txt(['.ticket-header-title',
+                      '.subject .ticket-title',
+                      '#ticket-title',
+                      'h2.ember-view']),
+    status:      txt(['.ticket-status-info .status-label',
+                      '.status-pill',
+                      '[data-label="Status"] .value']),
+    priority:    txt(['[data-label="Priority"] .value',
+                      '.ticket-priority']),
+    customer:    txt(['.requester-info .name',
+                      '.contact-name',
+                      '.requester-name a']),
+    description: txt(['.ticket-body .ticket-description',
+                      '.description_html .ticket-description',
+                      '.ticket-content p']),
+  };
+}
+
+function extractHubSpot() {
+  return {
+    ticketId:    window.location.pathname.match(/tickets\/(\d+)/)?.[1] || null,
+    subject:     txt(['[data-selenium-id="ticket-name"]',
+                      '.ticket-name-input input',
+                      'h1[data-test-id="record-name"]']),
+    status:      txt(['[data-test-id="pipeline-stage-label"]',
+                      '.pipeline-stage-selector button span']),
+    priority:    txt(['[data-property-name="hs_ticket_priority"] .private-select__label',
+                      '[data-property-name="priority"] span']),
+    customer:    txt(['[data-test-id="associated-contact-name"]',
+                      '.associated-objects .contact-name']),
+    description: txt(['[data-property-name="content"] .private-textarea',
+                      '[data-property-name="hs_ticket_description"] textarea',
+                      '[data-property-name="content"] textarea']),
+  };
+}
+
+function extractServiceNow() {
+  return {
+    ticketId:    txt(['#sys_readonly\\.incident\\.number',
+                      '[id$=".number"] input',
+                      '.form-group [name="number"]']),
+    subject:     txt(['#sys_readonly\\.incident\\.short_description',
+                      '[id$=".short_description"] input',
+                      '[name="short_description"]']),
+    status:      txt(['[id$=".state"] select option:checked',
+                      '[name="state"] option:checked']),
+    priority:    txt(['[id$=".priority"] select option:checked',
+                      '[name="priority"] option:checked']),
+    customer:    txt(['[id$=".caller_id"] input',
+                      '[name="caller_id"]']),
+    description: txt(['[id$=".description"] textarea',
+                      '[name="description"]']),
+  };
+}
+
+function extractIntercom() {
+  return {
+    ticketId:    window.location.pathname.match(/conversations\/(\d+)/)?.[1] || null,
+    subject:     txt(['.conversation-title',
+                      '.conversation__subject',
+                      '[data-test="conversation-subject"]']),
+    status:      txt(['.conversation-state',
+                      '[data-test="conversation-state"]']),
+    customer:    txt(['.user-name',
+                      '.conversation__user-name',
+                      '[data-test="user-name"]']),
+    description: txt(['.comment-body .intercom-interblocks-paragraph',
+                      '.conversation-part-body p']),
+  };
+}
+
+function extractGeneric() {
+  // Fallback: try to get any visible heading + first paragraph
+  return {
+    subject:     txt(['h1', 'h2', '.page-title', '.ticket-title']),
+    description: txt(['.description', '.content p', 'main p', 'article p']),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch to the right extractor based on hostname
+// ---------------------------------------------------------------------------
+function extractPageData() {
+  const hostname = window.location.hostname;
+  let data = {};
+
+  if (/salesforce\.com|lightning\.force\.com/.test(hostname)) data = extractSalesforce();
+  else if (/zendesk\.com/.test(hostname))                       data = extractZendesk();
+  else if (/freshdesk\.com|freshworks\.com/.test(hostname))     data = extractFreshdesk();
+  else if (/hubspot\.com/.test(hostname))                       data = extractHubSpot();
+  else if (/servicenow\.com/.test(hostname))                    data = extractServiceNow();
+  else if (/intercom\.com/.test(hostname))                      data = extractIntercom();
+  else                                                           data = extractGeneric();
+
+  // Strip nulls so we don't send empty fields
+  return Object.fromEntries(Object.entries(data).filter(([, v]) => v != null && v !== ''));
+}
+
+// ---------------------------------------------------------------------------
+// Send page context (URL / title / platform)
 // ---------------------------------------------------------------------------
 function sendPageContext() {
   const hostname = window.location.hostname;
@@ -59,9 +224,26 @@ function sendPageContext() {
     title:    document.title,
     hostname,
     platform: getPlatformLabel(hostname),
-  }).catch(() => {
-    // Extension context may be invalidated after an update — safe to ignore
-  });
+  }).catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Send extracted page data (ticket fields) — debounced 1.2s after DOM settles
+// ---------------------------------------------------------------------------
+let pageDataTimer = null;
+
+function sendPageData() {
+  clearTimeout(pageDataTimer);
+  pageDataTimer = setTimeout(() => {
+    const data = extractPageData();
+    if (Object.keys(data).length === 0) return; // nothing useful found
+    chrome.runtime.sendMessage({
+      type:     'PAGE_DATA',
+      platform: getPlatformLabel(window.location.hostname),
+      url:      window.location.href,
+      data,
+    }).catch(() => {});
+  }, 1200); // wait for the CRM's React/Angular to finish rendering
 }
 
 // ---------------------------------------------------------------------------
@@ -84,32 +266,30 @@ document.addEventListener('mouseup', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Title observer — lightweight, single-node watch for SPA title changes
+// Title observer — SPA title changes
 // ---------------------------------------------------------------------------
 const titleEl = document.querySelector('title');
 if (titleEl) {
-  new MutationObserver(() => sendPageContext())
-    .observe(titleEl, { childList: true });
+  new MutationObserver(() => {
+    sendPageContext();
+    sendPageData();
+  }).observe(titleEl, { childList: true });
 }
 
 // ---------------------------------------------------------------------------
-// URL observer — throttled to max once per 800ms
-// Fires on pushState / replaceState navigation in SPAs (Salesforce, Zendesk).
-// Using a coarse subtree watch is the only reliable way to catch these without
-// monkey-patching history.pushState.
+// URL observer — throttled to 800ms (SPA navigation)
 // ---------------------------------------------------------------------------
 let lastUrl       = window.location.href;
 let urlThrottleId = null;
 
 new MutationObserver(() => {
-  if (window.location.href === lastUrl) return; // URL unchanged — skip
+  if (window.location.href === lastUrl) return;
   lastUrl = window.location.href;
-
-  // Throttle: discard mutations that arrive within 800ms of the last send
   if (urlThrottleId) return;
   urlThrottleId = setTimeout(() => {
     urlThrottleId = null;
     sendPageContext();
+    sendPageData();
   }, 800);
 }).observe(document.body, { subtree: true, childList: true });
 
@@ -117,3 +297,4 @@ new MutationObserver(() => {
 // Initial send on script load
 // ---------------------------------------------------------------------------
 sendPageContext();
+sendPageData();

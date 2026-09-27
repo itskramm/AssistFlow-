@@ -189,6 +189,7 @@ export default function App() {
   const [isLoading,    setIsLoading]    = useState(false);
   const [platform,     setPlatform]     = useState('');
   const [selectedText, setSelectedText] = useState('');
+  const [pageContext,  setPageContext]   = useState(null); // live CRM ticket data
   const [darkMode,     setDarkMode]     = useState(() => {
     // Restore preference from storage; default to system preference
     try {
@@ -227,6 +228,9 @@ export default function App() {
       if (message.type === 'TAB_CONTEXT' || message.type === 'PAGE_CONTEXT') {
         applyTabContext(message);
       }
+      if (message.type === 'PAGE_DATA' && message.data) {
+        setPageContext(message.data);
+      }
       if (message.type === 'TEXT_SELECTED' && message.selectedText) {
         setSelectedText(message.selectedText);
       }
@@ -258,14 +262,20 @@ export default function App() {
     setSelectedText('');
     setIsLoading(true);
 
+    // Build request body — attach live CRM page context if available
+    const body = { message: trimmed };
+    if (pageContext && Object.keys(pageContext).length > 0) {
+      body.page_context = pageContext;
+    }
+
     try {
       const controller = new AbortController();
-      const timeoutId  = setTimeout(() => controller.abort(), 30000); // 30s — Gemini can be slow
+      const timeoutId  = setTimeout(() => controller.abort(), 30000);
 
       const res = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -350,6 +360,11 @@ export default function App() {
             {platform ? `Active on ${platform}` : 'Workspace Support'}
           </p>
           <h1>AssistFlow</h1>
+          {pageContext?.subject && (
+            <p className="context-label" title={pageContext.subject}>
+              📋 {pageContext.ticketId ? `#${pageContext.ticketId} · ` : ''}{pageContext.subject.slice(0, 40)}{pageContext.subject.length > 40 ? '…' : ''}
+            </p>
+          )}
         </div>
         <div className="topbar-right">
           <button

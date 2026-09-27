@@ -21,6 +21,11 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="Agent's query or issue description")
+    page_context: dict | None = Field(
+        default=None,
+        description="Live CRM page data extracted by the content script "
+                    "(ticket subject, description, status, priority, customer, ticketId)"
+    )
 
 
 class FeedbackRequest(BaseModel):
@@ -47,7 +52,10 @@ async def chat(request: ChatRequest, req: Request) -> dict:
     chat_service = req.app.state.chat_service
 
     try:
-        result = await chat_service.process_message(request.message)
+        result = await chat_service.process_message(
+            request.message,
+            page_context=request.page_context,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

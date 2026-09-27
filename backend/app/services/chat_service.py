@@ -87,9 +87,16 @@ class ChatService:
     # Public async interface
     # ------------------------------------------------------------------
 
-    async def process_message(self, message: str) -> dict:
+    async def process_message(self, message: str, page_context: dict | None = None) -> dict:
         """
         Main entry point called by the /api/chat route.
+
+        Args:
+            message:      The agent's natural-language query.
+            page_context: Optional dict of CRM ticket fields extracted from the
+                          active browser page by the content script. When present
+                          it is injected into the RAG prompt so Gemini can tailor
+                          its answer to the specific ticket the agent is viewing.
 
         Returns a dict with:
           reply, status, source, latency_ms, retrieved_sources
@@ -104,7 +111,7 @@ class ChatService:
         try:
             # Offload blocking I/O to the thread pool — keeps the event loop free
             context_chunks, sources = await asyncio.to_thread(self._retrieve, text)
-            reply = await self._generate_with_retry(text, context_chunks)
+            reply = await self._generate_with_retry(text, context_chunks, page_context)
             source = "rag"
         except Exception as exc:
             logger.warning("RAG pipeline failed (%s). Trying offline cache.", exc)
@@ -162,7 +169,12 @@ class ChatService:
         logger.debug("Retrieved %d chunks from %s sources.", len(chunks), len(sources))
         return chunks, sources
 
-    async def _generate_with_retry(self, query: str, context_chunks: list[str]) -> str:
+    async def _generate_with_retry(
+        self,
+        query: str,
+        context_chunks: list[str],
+        page_context: dict | None = None,
+    ) -> str:
         """
         Call Gemini 2.5 Flash with exponential-backoff retry to handle
         transient 429 (rate limit) and 5xx errors from the API.
@@ -172,7 +184,7 @@ class ChatService:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 # _generate is synchronous (LangChain invoke) — offload it
-                return await asyncio.to_thread(self._generate, query, context_chunks)
+                return await asyncio.to_thread(self._generate, query, context_chunks, page_context)
             except Exception as exc:
                 last_exc = exc
                 is_retryable = any(
@@ -190,11 +202,17 @@ class ChatService:
 
         raise last_exc  # re-raise so process_message can trigger offline fallback
 
-    def _generate(self, query: str, context_chunks: list[str]) -> str:
+    def _generate(
+        self,
+        query: str,
+        context_chunks: list[str],
+        page_context: dict | None = None,
+    ) -> str:
         """
-        Build the RAG prompt and call Gemini 2.5 Flash.
+        Build the RAG prompt and call Gemini.
         Runs synchronously — always call via asyncio.to_thread().
         """
+        # --- Knowledge base context ---
         if context_chunks:
             context_block = "\n\n---\n\n".join(context_chunks)
             context_section = f"CONTEXT FROM KNOWLEDGE BASE:\n{context_block}"
@@ -204,7 +222,31 @@ class ChatService:
                 "(No relevant procedures found in the knowledge base.)"
             )
 
-        user_content = f"{context_section}\n\nAGENT QUERY:\n{query}"
+        # --- Live CRM page context (optional) ---
+        page_section = ""
+        if page_context and isinstance(page_context, dict):
+            field_map = {
+                "ticketId":    "Ticket/Case ID",
+                "subject":     "Subject",
+                "status":      "Status",
+                "priority":    "Priority",
+                "customer":    "Customer",
+                "description": "Description",
+            }
+            lines = []
+            for key, label in field_map.items():
+                val = page_context.get(key)
+                if val:
+                    lines.append(f"  {label}: {val}")
+            if lines:
+                page_section = "\nCURRENT PAGE — TICKET/CASE DETAILS:\n" + "\n".join(lines)
+                logger.debug("Page context injected: %s", list(page_context.keys()))
+
+        user_content = (
+            f"{context_section}"
+            f"{page_section}"
+            f"\n\nAGENT QUERY:\n{query}"
+        )
 
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),
@@ -212,7 +254,6 @@ class ChatService:
         ]
 
         response = self._llm.invoke(messages)
-        # content can be a string or a list of content parts depending on the model
         content = response.content
         if isinstance(content, list):
             content = " ".join(
