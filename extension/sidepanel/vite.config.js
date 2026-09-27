@@ -55,15 +55,19 @@ export default defineConfig({
           logLevel: 'warn',
         });
 
-        // Copy debug.html into dist/ so it's accessible as an extension page
+        // Copy debug.html and debug.js into dist/ so they're accessible as extension pages
         try {
           mkdirSync(resolve(__dirname, 'dist'), { recursive: true });
           copyFileSync(
             resolve(__dirname, 'debug.html'),
             resolve(__dirname, 'dist/debug.html')
           );
+          copyFileSync(
+            resolve(__dirname, 'debug.js'),
+            resolve(__dirname, 'dist/debug.js')
+          );
         } catch {
-          // debug.html is optional — silently skip if missing
+          // debug files are optional — silently skip if missing
         }
       },
     },
