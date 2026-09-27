@@ -43,12 +43,13 @@ MAX_RETRIES = 3     # Gemini call attempts before giving up
 RETRY_BASE_S = 1.5  # seconds — doubles on each retry
 
 SYSTEM_PROMPT = """You are AssistFlow, an AI support assistant for call center agents.
-Your job is to help agents resolve issues quickly using the company's Standard Operating Procedures (SOPs) and troubleshooting guides.
+Your job is to help agents resolve issues quickly using the company's Standard Operating Procedures (SOPs) and troubleshooting guides provided in the context below.
 
 Rules:
-- Answer ONLY using the provided context. Do not use outside knowledge.
-- Format your response as clear, numbered step-by-step instructions when applicable.
-- If the context does not contain a relevant answer, say: "I couldn't find a matching procedure. Please escalate to your supervisor."
+- Base your answer primarily on the provided context. You may use general IT knowledge only to clarify or supplement the context.
+- Format your response as clear, numbered step-by-step instructions when the query involves a procedure or troubleshooting.
+- If the context contains relevant information, use it — even if the match is partial.
+- If the context contains absolutely no relevant information at all, say: "I couldn't find a matching procedure. Please escalate to your supervisor."
 - Keep responses concise and actionable. Avoid filler phrases.
 """
 
@@ -62,13 +63,13 @@ class ChatService:
 
         # Embedding model for query vectorisation
         self._embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
+            model="models/gemini-embedding-001",
             google_api_key=GEMINI_API_KEY,
         )
 
-        # Gemini 2.5 Flash for generation
+        # Gemini 3.8 Flash for generation
         self._llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             google_api_key=GEMINI_API_KEY,
             temperature=0.2,
         )
@@ -211,7 +212,14 @@ class ChatService:
         ]
 
         response = self._llm.invoke(messages)
-        return response.content.strip()
+        # content can be a string or a list of content parts depending on the model
+        content = response.content
+        if isinstance(content, list):
+            content = " ".join(
+                part.get("text", "") if isinstance(part, dict) else str(part)
+                for part in content
+            )
+        return content.strip()
 
     def _offline_fallback(self, query: str) -> str | None:
         """
@@ -227,17 +235,34 @@ class ChatService:
         try:
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT answer FROM offline_protocols "
-                "WHERE LOWER(question) LIKE ? "
-                "ORDER BY rowid LIMIT 1",
-                (f"%{query.lower()[:60]}%",),
-            )
-            row = cursor.fetchone()
+
+            # Split the query into keywords and score each row by how many match.
+            # Returns the highest-scoring row, falling back to any partial match.
+            keywords = [w for w in query.lower().split() if len(w) > 3]
+            if not keywords:
+                conn.close()
+                return None
+
+            cursor.execute("SELECT question, answer FROM offline_protocols")
+            rows = cursor.fetchall()
             conn.close()
-            if row:
-                logger.info("Offline cache hit for query: %r", query[:60])
-            return row[0] if row else None
+
+            best_answer = None
+            best_score = 0
+            for question, answer in rows:
+                q_lower = question.lower()
+                score = sum(1 for kw in keywords if kw in q_lower)
+                if score > best_score:
+                    best_score = score
+                    best_answer = answer
+
+            if best_answer and best_score >= 1:
+                logger.info(
+                    "Offline cache hit (score=%d) for query: %r", best_score, query[:60]
+                )
+                return best_answer
+
+            return None
         except Exception as exc:
             logger.error("Offline cache query failed: %s", exc)
             return None

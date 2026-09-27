@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AssistFlow — Extension Debug Panel</title>
+  <style>
+    :root {
+      font-family: 'Segoe UI', Inter, system-ui, sans-serif;
+      font-size: 14px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #475569;
+      flex-shrink: 0;
+    }
+
+    .dot.ok    { background: #22c55e; }
+    .dot.warn  { background: #f59e0b; }
+    .dot.error { background: #ef4444; }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 7px 13px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+      transition: background 0.15s;
+    }
+
+    button:hover  { background: #1d4ed8; }
+    button.danger { background: #dc2626; }
+    button.danger:hover { background: #b91c1c; }
+    button.neutral { background: #334155; }
+    button.neutral:hover { background: #475569; }
+
+    .log {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.75rem;
+      max-height: 220px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+
+    .log-entry { display: flex; gap: 10px; }
+    .log-time  { color: #475569; flex-shrink: 0; }
+    .log-ok    { color: #22c55e; }
+    .log-warn  { color: #f59e0b; }
+    .log-error { color: #ef4444; }
+    .log-info  { color: #38bdf8; }
+    .log-data  { color: #a78bfa; }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.82rem;
+      padding: 8px 10px;
+      outline: none;
+      margin-bottom: 8px;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      border-color: #3b82f6;
+    }
+
+    textarea { resize: vertical; min-height: 60px; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .badge-ok    { background: #14532d; color: #86efac; }
+    .badge-error { background: #450a0a; color: #fca5a5; }
+    .badge-warn  { background: #451a03; color: #fcd34d; }
+    .badge-idle  { background: #1e293b; color: #94a3b8; }
+
+    .kv-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    .kv-table td { padding: 4px 6px; font-size: 0.76rem; vertical-align: top; }
+    .kv-table td:first-child { color: #64748b; white-space: nowrap; width: 140px; }
+    .kv-table td:last-child  { color: #e2e8f0; word-break: break-all; }
+    .kv-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    #env-status { margin-top: 10px; }
+
+    hr { border: none; border-top: 1px solid #1e293b; margin: 8px 0; }
+  </style>
+</head>
+<body>
+
+<h1>🛠 AssistFlow — Chrome Extension Debug Panel</h1>
+<p class="subtitle">
+  Open this file inside the loaded extension context, or from any tab while the extension is active.<br>
+  All tests run against the live extension APIs and the local backend at <code>http://127.0.0.1:8000</code>.
+</p>
+
+<div class="grid">
+
+  <!-- ─────────────────────────────────────────────
+       1. Extension Runtime
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-runtime"></span>1 · Extension Runtime</div>
+    <div class="btn-row">
+      <button onclick="checkRuntime()">Check chrome.runtime</button>
+      <button onclick="pingBackground()">Ping Background SW</button>
+    </div>
+    <div class="log" id="log-runtime"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       2. Storage
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-storage"></span>2 · Storage (session + local)</div>
+    <div class="btn-row">
+      <button onclick="readSessionStorage()">Read session storage</button>
+      <button onclick="readLocalStorage()">Read local storage</button>
+      <button class="neutral" onclick="clearStorage()">Clear all</button>
+    </div>
+    <div class="log" id="log-storage"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       3. Tab Context
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-tabs"></span>3 · Tab Context & Active Tab</div>
+    <div class="btn-row">
+      <button onclick="getActiveTab()">Get active tab</button>
+      <button onclick="sendPanelReady()">Send PANEL_READY</button>
+    </div>
+    <div class="log" id="log-tabs"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       4. Content Script Messages
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-content"></span>4 · Content Script Messages</div>
+    <div class="btn-row">
+      <button onclick="simulatePageContext()">Simulate PAGE_CONTEXT</button>
+      <button onclick="simulateTextSelected()">Simulate TEXT_SELECTED</button>
+      <button onclick="simulateContextMenu()">Simulate CONTEXT_MENU_QUERY</button>
+    </div>
+    <div class="log" id="log-content"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       5. Backend Health
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-health"></span>5 · Backend — Health Check</div>
+    <div class="btn-row">
+      <button onclick="checkHealth()">GET /api/health</button>
+    </div>
+    <div id="env-status"></div>
+    <div class="log" id="log-health"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       6. Chat API
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-chat"></span>6 · Backend — POST /api/chat</div>
+    <input type="text" id="chat-input" placeholder="Type a test query…" value="How do I handle a Salesforce login failure?" />
+    <div class="btn-row">
+      <button onclick="testChat()">Send query</button>
+      <button class="neutral" onclick="testChatOffline()">Test offline fallback</button>
+    </div>
+    <div class="log" id="log-chat"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       7. Feedback API
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-feedback"></span>7 · Backend — POST /api/feedback</div>
+    <div class="btn-row">
+      <button onclick="testFeedback(1)">👍 Thumbs Up</button>
+      <button onclick="testFeedback(2)">👎 Thumbs Down</button>
+    </div>
+    <div class="log" id="log-feedback"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       8. Message Bus — Send Custom Message
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-msg"></span>8 · Message Bus — Custom Message</div>
+    <textarea id="msg-input" placeholder='{ "type": "ping" }'></textarea>
+    <div class="btn-row">
+      <button onclick="sendCustomMessage()">Send to background</button>
+    </div>
+    <div class="log" id="log-msg"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       9. Permissions
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-perms"></span>9 · Permissions Check</div>
+    <div class="btn-row">
+      <button onclick="checkPermissions()">Check all permissions</button>
+    </div>
+    <div class="log" id="log-perms"><span class="log-info log-entry">Waiting for test…</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────
+       10. Run All Tests
+  ───────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="dot" id="dot-all"></span>10 · Run All Tests</div>
+    <div class="btn-row">
+      <button onclick="runAll()">▶ Run all tests</button>
+      <button class="danger" onclick="clearAllLogs()">Clear all logs</button>
+    </div>
+    <div class="log" id="log-all"><span class="log-info log-entry">Press "Run all tests" to start.</span></div>
+  </div>
+
+</div><!-- /.grid -->
+
+<script>
+  // ---------------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------------
+  const BACKEND = 'http://127.0.0.1:8000';
+
+  function ts() {
+    return new Date().toTimeString().slice(0, 8);
+  }
+
+  function log(logId, type, msg) {
+    const el = document.getElementById(logId);
+    if (el.querySelector('.log-info')?.textContent === 'Waiting for test…') el.innerHTML = '';
+    const line = document.createElement('div');
+    line.className = 'log-entry';
+    line.innerHTML = `<span class="log-time">${ts()}</span><span class="log-${type}">${escHtml(String(msg))}</span>`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function logData(logId, obj) {
+    const el = document.getElementById(logId);
+    const line = document.createElement('div');
+    line.className = 'log-entry';
+    line.innerHTML = `<span class="log-time">${ts()}</span><span class="log-data">${escHtml(JSON.stringify(obj, null, 2))}</span>`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setDot(id, state) {
+    const el = document.getElementById('dot-' + id);
+    if (el) { el.className = 'dot ' + state; }
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function isExtensionContext() {
+    return typeof chrome !== 'undefined' && !!chrome.runtime?.id;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 1. Extension Runtime
+  // ---------------------------------------------------------------------------
+  function checkRuntime() {
+    if (!isExtensionContext()) {
+      log('log-runtime', 'error', '✗ chrome.runtime not available — open this file from inside the loaded extension.');
+      setDot('runtime', 'error');
+      return;
+    }
+    log('log-runtime', 'ok', '✓ chrome.runtime available');
+    log('log-runtime', 'info', `  Extension ID: ${chrome.runtime.id}`);
+    const manifest = chrome.runtime.getManifest();
+    log('log-runtime', 'info', `  Name: ${manifest.name} v${manifest.version}`);
+    log('log-runtime', 'info', `  Manifest version: ${manifest.manifest_version}`);
+    setDot('runtime', 'ok');
+  }
+
+  function pingBackground() {
+    if (!isExtensionContext()) { log('log-runtime', 'error', '✗ Not in extension context'); return; }
+    chrome.runtime.sendMessage({ type: 'ping' }, (response) => {
+      if (chrome.runtime.lastError) {
+        log('log-runtime', 'error', `✗ Background ping failed: ${chrome.runtime.lastError.message}`);
+        setDot('runtime', 'error');
+        return;
+      }
+      if (response?.ok) {
+        log('log-runtime', 'ok', `✓ Background SW responded: ${response.service}`);
+        setDot('runtime', 'ok');
+      } else {
+        log('log-runtime', 'warn', `⚠ Unexpected response: ${JSON.stringify(response)}`);
+        setDot('runtime', 'warn');
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. Storage
+  // ---------------------------------------------------------------------------
+  function readSessionStorage() {
+    if (!isExtensionContext()) { log('log-storage', 'error', '✗ Not in extension context'); return; }
+    chrome.storage.session.get(null, (items) => {
+      if (chrome.runtime.lastError) {
+        log('log-storage', 'error', `✗ ${chrome.runtime.lastError.message}`);
+        setDot('storage', 'error');
+        return;
+      }
+      const keys = Object.keys(items);
+      if (keys.length === 0) {
+        log('log-storage', 'warn', '⚠ session storage is empty (panel may not have opened on a CRM tab yet)');
+        setDot('storage', 'warn');
+      } else {
+        log('log-storage', 'ok', `✓ session storage has ${keys.length} key(s):`);
+        logData('log-storage', items);
+        setDot('storage', 'ok');
+      }
+    });
+  }
+
+  function readLocalStorage() {
+    if (!isExtensionContext()) { log('log-storage', 'error', '✗ Not in extension context'); return; }
+    chrome.storage.local.get(null, (items) => {
+      const keys = Object.keys(items);
+      log('log-storage', keys.length > 0 ? 'ok' : 'warn',
+        keys.length > 0 ? `✓ local storage has ${keys.length} key(s):` : '⚠ local storage is empty');
+      if (keys.length > 0) logData('log-storage', items);
+      setDot('storage', keys.length > 0 ? 'ok' : 'warn');
+    });
+  }
+
+  function clearStorage() {
+    if (!isExtensionContext()) { log('log-storage', 'error', '✗ Not in extension context'); return; }
+    chrome.storage.session.clear(() => {
+      chrome.storage.local.clear(() => {
+        log('log-storage', 'warn', '⚠ All extension storage cleared');
+        setDot('storage', 'warn');
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Tab Context
+  // ---------------------------------------------------------------------------
+  function getActiveTab() {
+    if (!isExtensionContext()) { log('log-tabs', 'error', '✗ Not in extension context'); return; }
+    if (!chrome.tabs) { log('log-tabs', 'error', '✗ chrome.tabs not available — requires "tabs" permission'); setDot('tabs', 'error'); return; }
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs?.length) {
+        log('log-tabs', 'error', '✗ No active tab found');
+        setDot('tabs', 'error');
+        return;
+      }
+      const tab = tabs[0];
+      log('log-tabs', 'ok', `✓ Active tab:`);
+      logData('log-tabs', { id: tab.id, url: tab.url, title: tab.title, status: tab.status });
+      const isCrm = [
+        'salesforce.com','zendesk.com','freshdesk.com','genesyscloud.com',
+        'avayacloud.com','ringcentral.com','talkdesk.com','five9.com',
+        'hubspot.com','servicenow.com','intercom.com','helpscout.com',
+        'kustomer.com','zohocrm.com','zoho.com'
+      ].some(d => (tab.url || '').includes(d));
+      log('log-tabs', isCrm ? 'ok' : 'warn',
+        isCrm ? '✓ This is a known CRM domain — panel should auto-open' : '⚠ Not a known CRM domain — panel requires manual open');
+      setDot('tabs', 'ok');
+    });
+  }
+
+  function sendPanelReady() {
+    if (!isExtensionContext()) { log('log-tabs', 'error', '✗ Not in extension context'); return; }
+    chrome.runtime.sendMessage({ type: 'PANEL_READY' }, (response) => {
+      if (chrome.runtime.lastError) {
+        log('log-tabs', 'error', `✗ PANEL_READY failed: ${chrome.runtime.lastError.message}`);
+        setDot('tabs', 'error');
+        return;
+      }
+      log('log-tabs', 'ok', '✓ PANEL_READY acknowledged by background');
+      if (response?.context) {
+        log('log-tabs', 'info', '  Last known tab context:');
+        logData('log-tabs', response.context);
+      } else {
+        log('log-tabs', 'warn', '⚠ No tab context stored yet — navigate to a CRM tab first');
+      }
+      setDot('tabs', response?.context ? 'ok' : 'warn');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. Content Script Message Simulation
+  // ---------------------------------------------------------------------------
+  function simulatePageContext() {
+    if (!isExtensionContext()) { log('log-content', 'error', '✗ Not in extension context'); return; }
+    const msg = {
+      type: 'PAGE_CONTEXT',
+      url: 'https://mycompany.zendesk.com/agent/tickets/12345',
+      title: 'Ticket #12345 — Login Issue',
+      hostname: 'mycompany.zendesk.com',
+      platform: 'Zendesk',
+    };
+    chrome.runtime.sendMessage(msg, () => {
+      log('log-content', 'ok', '✓ PAGE_CONTEXT sent to background');
+      logData('log-content', msg);
+      setDot('content', 'ok');
+    });
+  }
+
+  function simulateTextSelected() {
+    if (!isExtensionContext()) { log('log-content', 'error', '✗ Not in extension context'); return; }
+    const msg = {
+      type: 'TEXT_SELECTED',
+      selectedText: 'Agent cannot log into Salesforce — getting invalid credentials error after password reset.',
+      url: 'https://mycompany.salesforce.com/cases',
+      title: 'Cases — Salesforce',
+    };
+    chrome.runtime.sendMessage(msg, () => {
+      log('log-content', 'ok', '✓ TEXT_SELECTED sent — panel should show selected-text banner');
+      logData('log-content', msg);
+      setDot('content', 'ok');
+    });
+  }
+
+  function simulateContextMenu() {
+    if (!isExtensionContext()) { log('log-content', 'error', '✗ Not in extension context'); return; }
+    const msg = {
+      type: 'CONTEXT_MENU_QUERY',
+      selectedText: 'Customer cannot hear me during the call',
+      url: 'https://mycompany.zendesk.com/agent',
+      title: 'Zendesk',
+    };
+    chrome.runtime.sendMessage(msg, () => {
+      log('log-content', 'ok', '✓ CONTEXT_MENU_QUERY sent — panel input should be pre-filled');
+      logData('log-content', msg);
+      setDot('content', 'ok');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5. Backend Health
+  // ---------------------------------------------------------------------------
+  async function checkHealth() {
+    const el = document.getElementById('env-status');
+    log('log-health', 'info', `→ GET ${BACKEND}/api/health`);
+    try {
+      const res = await fetch(`${BACKEND}/api/health`);
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        log('log-health', 'ok', `✓ Backend is up — ${data.service}`);
+        el.innerHTML = '<span class="status-badge badge-ok">● Backend Online</span>';
+        setDot('health', 'ok');
+      } else {
+        log('log-health', 'warn', `⚠ Unexpected response: ${JSON.stringify(data)}`);
+        el.innerHTML = '<span class="status-badge badge-warn">● Unexpected Response</span>';
+        setDot('health', 'warn');
+      }
+    } catch (err) {
+      log('log-health', 'error', `✗ Cannot reach backend: ${err.message}`);
+      log('log-health', 'error', '  Make sure the FastAPI server is running:');
+      log('log-health', 'error', '  → cd backend && python run.py --reload');
+      el.innerHTML = '<span class="status-badge badge-error">● Backend Offline</span>';
+      setDot('health', 'error');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6. Chat API
+  // ---------------------------------------------------------------------------
+  async function testChat() {
+    const query = document.getElementById('chat-input').value.trim();
+    if (!query) { log('log-chat', 'warn', '⚠ Enter a query first'); return; }
+    log('log-chat', 'info', `→ POST ${BACKEND}/api/chat`);
+    log('log-chat', 'info', `  message: "${query}"`);
+    const t0 = performance.now();
+    try {
+      const res = await fetch(`${BACKEND}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: query }),
+      });
+      const data = await res.json();
+      const elapsed = Math.round(performance.now() - t0);
+      if (res.ok) {
+        log('log-chat', 'ok', `✓ Response received in ${elapsed}ms (server: ${data.latency_ms}ms)`);
+        log('log-chat', 'info', `  source: ${data.source}`);
+        log('log-chat', 'info', `  sources: ${JSON.stringify(data.retrieved_sources)}`);
+        log('log-chat', 'data', `  reply: ${data.reply?.slice(0, 200)}${data.reply?.length > 200 ? '…' : ''}`);
+        setDot('chat', 'ok');
+      } else {
+        log('log-chat', 'error', `✗ HTTP ${res.status}: ${JSON.stringify(data)}`);
+        setDot('chat', 'error');
+      }
+    } catch (err) {
+      log('log-chat', 'error', `✗ Request failed: ${err.message}`);
+      setDot('chat', 'error');
+    }
+  }
+
+  async function testChatOffline() {
+    log('log-chat', 'warn', '⚠ Offline simulation: sending to a bad endpoint to test fallback…');
+    log('log-chat', 'info', '  (To properly test offline fallback, stop the backend and send a real query)');
+    try {
+      await fetch(`http://127.0.0.1:9999/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'test' }),
+        signal: AbortSignal.timeout(2000),
+      });
+    } catch {
+      log('log-chat', 'ok', '✓ Backend unreachable — extension will show Offline status and fallback message');
+      setDot('chat', 'warn');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 7. Feedback API
+  // ---------------------------------------------------------------------------
+  async function testFeedback(rating) {
+    const label = rating === 1 ? 'thumbs_up' : 'thumbs_down';
+    log('log-feedback', 'info', `→ POST ${BACKEND}/api/feedback (rating: ${label})`);
+    try {
+      const res = await fetch(`${BACKEND}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'How do I handle a Salesforce login failure?',
+          reply: '1. Ask the agent to confirm their email…',
+          rating,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        log('log-feedback', 'ok', `✓ Feedback accepted — ${data.rating}`);
+        setDot('feedback', 'ok');
+      } else {
+        log('log-feedback', 'error', `✗ HTTP ${res.status}: ${JSON.stringify(data)}`);
+        setDot('feedback', 'error');
+      }
+    } catch (err) {
+      log('log-feedback', 'error', `✗ Request failed: ${err.message}`);
+      setDot('feedback', 'error');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8. Custom Message
+  // ---------------------------------------------------------------------------
+  function sendCustomMessage() {
+    if (!isExtensionContext()) { log('log-msg', 'error', '✗ Not in extension context'); return; }
+    let payload;
+    try {
+      payload = JSON.parse(document.getElementById('msg-input').value || '{}');
+    } catch (e) {
+      log('log-msg', 'error', `✗ Invalid JSON: ${e.message}`);
+      setDot('msg', 'error');
+      return;
+    }
+    log('log-msg', 'info', `→ Sending: ${JSON.stringify(payload)}`);
+    chrome.runtime.sendMessage(payload, (response) => {
+      if (chrome.runtime.lastError) {
+        log('log-msg', 'warn', `⚠ ${chrome.runtime.lastError.message}`);
+        setDot('msg', 'warn');
+        return;
+      }
+      log('log-msg', 'ok', `✓ Response:`);
+      logData('log-msg', response ?? null);
+      setDot('msg', 'ok');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 9. Permissions
+  // ---------------------------------------------------------------------------
+  function checkPermissions() {
+    if (!isExtensionContext()) { log('log-perms', 'error', '✗ Not in extension context'); return; }
+    const required = ['storage', 'activeTab', 'tabs', 'contextMenus', 'scripting', 'sidePanel'];
+    let allOk = true;
+    required.forEach(p => {
+      chrome.permissions.contains({ permissions: [p] }, (has) => {
+        if (has) {
+          log('log-perms', 'ok', `  ✓ ${p}`);
+        } else {
+          log('log-perms', 'error', `  ✗ ${p} — MISSING`);
+          allOk = false;
+        }
+      });
+    });
+    setTimeout(() => {
+      setDot('perms', allOk ? 'ok' : 'error');
+    }, 300);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 10. Run All
+  // ---------------------------------------------------------------------------
+  async function runAll() {
+    document.getElementById('log-all').innerHTML = '';
+    log('log-all', 'info', '=== AssistFlow Extension Test Suite ===');
+
+    log('log-all', 'info', '\n[1] Runtime check…');
+    if (isExtensionContext()) {
+      log('log-all', 'ok', `  ✓ chrome.runtime.id = ${chrome.runtime.id}`);
+    } else {
+      log('log-all', 'error', '  ✗ Not in extension context — run from the loaded extension');
+    }
+
+    log('log-all', 'info', '\n[2] Backend health…');
+    try {
+      const r = await fetch(`${BACKEND}/api/health`);
+      const d = await r.json();
+      log('log-all', d.status === 'ok' ? 'ok' : 'warn', `  ${d.status === 'ok' ? '✓' : '⚠'} ${d.service} (HTTP ${r.status})`);
+      setDot('all', 'ok');
+    } catch (e) {
+      log('log-all', 'error', `  ✗ Backend unreachable — ${e.message}`);
+      setDot('all', 'error');
+    }
+
+    log('log-all', 'info', '\n[3] Chat API…');
+    try {
+      const r = await fetch(`${BACKEND}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Test query from debug panel' }),
+      });
+      const d = await r.json();
+      log('log-all', r.ok ? 'ok' : 'error',
+        r.ok ? `  ✓ Reply received (${d.latency_ms}ms, source: ${d.source})` : `  ✗ HTTP ${r.status}`);
+    } catch (e) {
+      log('log-all', 'error', `  ✗ ${e.message}`);
+    }
+
+    log('log-all', 'info', '\n[4] Feedback API…');
+    try {
+      const r = await fetch(`${BACKEND}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'test', reply: 'test reply', rating: 1 }),
+      });
+      const d = await r.json();
+      log('log-all', r.ok ? 'ok' : 'error', r.ok ? `  ✓ ${d.rating}` : `  ✗ HTTP ${r.status}`);
+    } catch (e) {
+      log('log-all', 'error', `  ✗ ${e.message}`);
+    }
+
+    if (isExtensionContext()) {
+      log('log-all', 'info', '\n[5] Background SW ping…');
+      chrome.runtime.sendMessage({ type: 'ping' }, (res) => {
+        log('log-all', res?.ok ? 'ok' : 'error',
+          res?.ok ? `  ✓ SW alive: ${res.service}` : `  ✗ No response`);
+      });
+
+      log('log-all', 'info', '\n[6] Session storage…');
+      chrome.storage.session.get(null, (items) => {
+        const k = Object.keys(items).length;
+        log('log-all', k > 0 ? 'ok' : 'warn',
+          k > 0 ? `  ✓ ${k} key(s) in session storage` : '  ⚠ Session storage empty');
+      });
+    }
+
+    log('log-all', 'info', '\n=== Test suite complete ===');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clear all logs
+  // ---------------------------------------------------------------------------
+  function clearAllLogs() {
+    ['runtime','storage','tabs','content','health','chat','feedback','msg','perms','all'].forEach(id => {
+      const el = document.getElementById('log-' + id);
+      if (el) el.innerHTML = '<span class="log-info log-entry">Cleared.</span>';
+      setDot(id, '');
+    });
+    document.getElementById('env-status').innerHTML = '';
+  }
+
+  // Auto-run health check on page load
+  window.addEventListener('load', checkHealth);
+</script>
+</body>
+</html>

@@ -43,7 +43,7 @@ This repository contains the source code for the AI-Assisted Workplace Support S
 | Offline fallback message when backend is unreachable | `src/App.jsx` | ✅ |
 | Narrow-safe CSS (min-width 240px, slim scrollbar, truncation-safe layout) | `src/index.css` | ✅ |
 | Vite dual-entry build — side panel + `content.js` as separate stable bundle | `vite.config.js` | ✅ |
-| First production build (`npm run build`) | — | ⬜ |
+| First production build (`npm run build`) — `dist/` folder exists with assets | `dist/` | ✅ |
 | Streaming response support | — | ⬜ |
 
 ---
@@ -74,7 +74,7 @@ This repository contains the source code for the AI-Assisted Workplace Support S
 | RAG pipeline wired into `/api/chat` | `app/services/chat_service.py` | ✅ |
 | SQLite offline fallback on Gemini/network failure | `app/services/chat_service.py` | ✅ |
 | `run.py` — startup script with `--host`, `--port`, `--reload`, `--log-level` flags | `run.py` | ✅ |
-| Full `pip install -r requirements.txt` in venv | — | ⬜ |
+| Full `pip install -r requirements.txt` in venv — all packages confirmed installed | `.venv/` | ✅ |
 
 ---
 
@@ -93,8 +93,8 @@ This repository contains the source code for the AI-Assisted Workplace Support S
 | Google `text-embedding-004` embedding via `GoogleGenerativeAIEmbeddings` | `scripts/ingest_knowledge.py` | ✅ |
 | ChromaDB `PersistentClient` — cosine similarity, stores to `data/chroma/` | `scripts/ingest_knowledge.py` | ✅ |
 | Retriever — top-4 cosine similarity search, integrated into `ChatService` | `app/services/chat_service.py` | ✅ |
-| Real SOP / procedure documents added to `data/knowledge/` (5 SOPs: login, telephony, downtime, escalation, identity verification) | `data/knowledge/` | ✅ |
-| First ingestion run (`python scripts/ingest_knowledge.py`) | — | ⬜ |
+| 5 SOP documents added to `data/knowledge/` (CRM login, telephony, downtime, escalation, identity verification) | `data/knowledge/` | ✅ |
+| First ingestion run — `data/chroma/` vector store populated | `data/chroma/` | ⬜ |
 
 ---
 
@@ -127,7 +127,7 @@ This repository contains the source code for the AI-Assisted Workplace Support S
 | Task | File | Status |
 |---|---|---|
 | `data/offline_cache/` directory | `data/offline_cache/` | ✅ |
-| `sqlite-utils` in `requirements.txt` | `requirements.txt` | ✅ |
+| `sqlite-utils` in `requirements.txt` (confirmed installed) | `requirements.txt` | ✅ |
 | `OFFLINE_DB_PATH` in `config.py` | `app/core/config.py` | ✅ |
 | Offline fallback in `ChatService` — queries SQLite on Gemini failure | `app/services/chat_service.py` | ✅ |
 | Frontend shows "Offline" status when backend is unreachable | `src/App.jsx` | ✅ |
@@ -145,7 +145,7 @@ This repository contains the source code for the AI-Assisted Workplace Support S
 
 | Task | File | Status |
 |---|---|---|
-| `ragas` + `pandas` in `requirements.txt` | `requirements.txt` | ✅ |
+| `ragas` + `pandas` in `requirements.txt` (confirmed installed) | `requirements.txt` | ✅ |
 | `evaluate_rag.py` scaffolded | `scripts/evaluate_rag.py` | 🔧 |
 | Per-request latency logged via `RequestLoggingMiddleware` + `chat_service.py` | `app/api/middleware.py` | ✅ |
 | Evaluation dataset — question + ground truth pairs | — | ⬜ |
@@ -158,12 +158,9 @@ This repository contains the source code for the AI-Assisted Workplace Support S
 
 | Step | Command / Action |
 |---|---|
-| 1. Install Python dependencies | `cd backend && pip install -r requirements.txt` |
-| 2. Add SOP documents | Drop `.md` or `.txt` files into `data/knowledge/` |
-| 3. Run knowledge ingestion | `python scripts/ingest_knowledge.py` |
-| 4. Start the backend | `cd backend && python run.py --reload` |
-| 5. Verify health endpoint | `curl http://127.0.0.1:8000/api/health` |
-| 6. Build the extension | `cd extension/sidepanel && npm run build` |
-| 7. Load in Chrome | `chrome://extensions` → Load unpacked → select `dist/` |
-| 8. Seed SQLite offline DB | Create `offline_protocols` table + insert fallback procedures |
-| 9. Run RAG evaluation | Implement + run `scripts/evaluate_rag.py` |
+| 1. Run first knowledge ingestion | `python scripts/ingest_knowledge.py` (from project root) |
+| 2. Start the backend | `cd backend && python run.py --reload` |
+| 3. Verify health endpoint | `curl http://127.0.0.1:8000/api/health` |
+| 4. Load extension in Chrome | `chrome://extensions` → Load unpacked → select `extension/sidepanel/dist/` |
+| 5. Seed SQLite offline DB | Create `offline_protocols` table + insert fallback procedures |
+| 6. Run RAG evaluation | Implement + run `scripts/evaluate_rag.py` |

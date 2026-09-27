@@ -97,7 +97,7 @@ def ingest() -> None:
     # 3. Embed
     print("Step 3: Generating embeddings with text-embedding-004...")
     embeddings_model = GoogleGenerativeAIEmbeddings(
-        model="models/text-embedding-004",
+        model="models/gemini-embedding-001",
         google_api_key=api_key,
     )
     texts = [c["text"] for c in chunks]
