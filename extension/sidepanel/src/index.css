@@ -451,3 +451,47 @@ html.dark .status-pill.offline { background: #450a0a; color: #fca5a5; }
 }
 .composer button:hover:not(:disabled) { background: #1d4ed8; }
 .composer button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Offline topic list ─────────────────────────────────────────────────── */
+
+.topic-list {
+  padding: 2px 0;
+}
+
+.topic-list-heading {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.topic-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.topic-btn {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1.35;
+}
+
+.topic-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}

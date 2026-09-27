@@ -3,7 +3,7 @@
  *
  * When the backend is unreachable, searchFaq() is called directly in the
  * browser — no network request at all. Each entry has a `keywords` array
- * (matched against the agent's query) and an `answer` string.
+ * (matched against the agent's query), a `label` for display, and an `answer`.
  *
  * Scoring: count how many keywords appear in the lowercased query.
  * Returns the highest-scoring answer, or null if nothing matches.
@@ -14,6 +14,7 @@ const FAQ = [
   // ── CRM / LOGIN ──────────────────────────────────────────────────────────
 
   {
+    label: 'CRM login failure / wrong password',
     keywords: ['login', 'log in', 'cannot login', 'cant log in', 'password', 'credentials',
                'crm login', 'salesforce login', 'zendesk login', 'freshdesk login',
                'hubspot login', 'servicenow login', 'zoho login', 'wrong password',
@@ -27,6 +28,7 @@ const FAQ = [
   },
 
   {
+    label: 'Account locked / too many login attempts',
     keywords: ['locked', 'lock out', 'locked out', 'too many attempts', 'account locked',
                'login blocked', 'account suspended', 'failed attempts', 'many wrong passwords'],
     answer:
@@ -37,6 +39,7 @@ const FAQ = [
   },
 
   {
+    label: 'SSO / Single Sign-On failure',
     keywords: ['sso', 'single sign on', 'single sign-on', 'saml', 'oauth', 'sso failed',
                'sso error', 'sso not working', 'identity provider', 'idp', 'sso broken',
                'cannot authenticate', 'sso redirect', 'federation error'],
@@ -50,6 +53,7 @@ const FAQ = [
   },
 
   {
+    label: 'No access to module or queue (permission denied)',
     keywords: ['no access', 'permission denied', 'missing permission', 'cant see queue',
                'no queue access', 'access not granted', 'permission set', 'role wrong',
                '403 forbidden', 'missing module', 'cant see cases', 'cant see tickets',
@@ -64,6 +68,7 @@ const FAQ = [
   },
 
   {
+    label: 'CRM session expiring repeatedly',
     keywords: ['session expired', 'keeps logging out', 'session timeout', 'kicked out',
                'auto logout', 'session not persisting', 'crm logs out', 'invalid session',
                'INVALID_SESSION_ID', 'session keeps expiring', 'repeated logout'],
@@ -76,6 +81,7 @@ const FAQ = [
   },
 
   {
+    label: 'Record locked / cannot save (concurrent edit)',
     keywords: ['record locked', 'unable to lock row', 'UNABLE_TO_LOCK_ROW', 'cannot save',
                'concurrent edit', 'someone else editing', 'locked record', 'save failed',
                'record in use', 'changes not saving', 'locked ticket'],
@@ -87,6 +93,7 @@ const FAQ = [
   },
 
   {
+    label: 'Zendesk down / 503 Service Unavailable',
     keywords: ['zendesk down', 'zendesk 503', 'zendesk not loading', 'zendesk error',
                'zendesk maintenance', '503 service unavailable', 'zendesk blank page',
                'ticket queue not loading', 'zendesk not working'],
@@ -99,6 +106,7 @@ const FAQ = [
   },
 
   {
+    label: 'Freshdesk authentication token expired',
     keywords: ['freshdesk session', 'freshdesk expired', 'freshdesk 401', 'freshdesk logout',
                'freshdesk token', 'authentication token expired', 'freshdesk keeps logging out'],
     answer:
@@ -108,6 +116,7 @@ const FAQ = [
   },
 
   {
+    label: 'HubSpot API rate limit exceeded',
     keywords: ['hubspot rate limit', 'hubspot 429', 'hubspot api limit', 'rate limit exceeded',
                'hubspot slow', 'hubspot workflows stopped', 'api throttled', 'hubspot api exceeded'],
     answer:
@@ -120,6 +129,7 @@ const FAQ = [
   // ── TELEPHONY / AUDIO ────────────────────────────────────────────────────
 
   {
+    label: 'Agent cannot hear customer (one-way audio)',
     keywords: ['cant hear customer', 'no audio', 'one way audio', 'silent call', 'no sound',
                'agent cannot hear', 'one-way audio', 'audio not working', 'customer silent',
                'headset no audio', 'media stream failed', 'genesys no audio', 'talkdesk audio'],
@@ -133,6 +143,7 @@ const FAQ = [
   },
 
   {
+    label: 'Customer cannot hear agent (mic not working)',
     keywords: ['customer cant hear', 'mic not working', 'microphone not working', 'muted',
                'no mic', 'mic blocked', 'microphone permission', 'getUserMedia',
                'headset muted', 'physical mute', 'customer cannot hear me'],
@@ -147,6 +158,7 @@ const FAQ = [
   },
 
   {
+    label: 'Call drops / disconnects unexpectedly',
     keywords: ['call drops', 'call dropping', 'disconnects', 'call cut off', 'lost connection',
                'unstable calls', 'bad connection', 'call keeps cutting', 'dropped call',
                'call disconnect', 'poor connection', 'calls disconnecting'],
@@ -160,6 +172,7 @@ const FAQ = [
   },
 
   {
+    label: 'Echo or background noise on the line',
     keywords: ['echo', 'background noise', 'noise on call', 'static', 'feedback on call',
                'reverb', 'noise suppression', 'echo cancellation', 'loud background',
                'choppy audio', 'robotic audio', 'words cutting out', 'audio degradation'],
@@ -173,6 +186,7 @@ const FAQ = [
   },
 
   {
+    label: 'Agent not receiving calls (status stuck)',
     keywords: ['not receiving calls', 'no calls routing', 'available no calls', 'calls not coming',
                'routing failure', 'agent stuck', 'status stuck', 'calls not assigned',
                'available but no calls', 'not getting calls', 'genesys not routing',
@@ -187,6 +201,7 @@ const FAQ = [
   },
 
   {
+    label: 'Softphone crashes or freezes',
     keywords: ['softphone crash', 'softphone crashed', 'app crash', 'softphone freezes',
                'phone app closing', 'talkdesk crash', 'ringcentral crash', 'five9 crash',
                'softphone not responding', 'app closes on call', 'softphone keeps closing'],
@@ -200,6 +215,7 @@ const FAQ = [
   },
 
   {
+    label: 'WebRTC / ICE connection failed (silent call)',
     keywords: ['webrtc', 'ice failed', 'ICE connection failed', 'ice gathering failed',
                'ice_failed', 'call connects no audio', 'silent both sides', 'webrtc error',
                'firewall webrtc', 'udp blocked', 'stun failed', 'turn failed'],
@@ -212,6 +228,7 @@ const FAQ = [
   },
 
   {
+    label: 'Conference / 3-way call failure',
     keywords: ['conference failed', 'three way call', '3 way call', 'conference bridge',
                'third party drops', 'conference call drop', 'bridge failure',
                'conference error', 'conference not working'],
@@ -224,6 +241,7 @@ const FAQ = [
   },
 
   {
+    label: 'Chrome microphone permission blocked',
     keywords: ['chrome mic blocked', 'microphone not allowed', 'browser blocked mic',
                'mic permission chrome', 'allow microphone', 'microphone access denied',
                'getUserMedia failed', 'site settings microphone', 'mic permission denied'],
@@ -239,6 +257,7 @@ const FAQ = [
   // ── SYSTEM DOWNTIME / OFFLINE WORKFLOW ──────────────────────────────────
 
   {
+    label: 'System / CRM down — offline workflow',
     keywords: ['system down', 'system unavailable', 'crm down', 'crm unavailable', 'outage',
                'platform down', 'everything down', 'nothing loading', 'cannot connect',
                'connection refused', 'network down', 'all systems down', 'lost connection',
@@ -254,6 +273,7 @@ const FAQ = [
   },
 
   {
+    label: 'Phone / dialer unavailable — backup procedure',
     keywords: ['phone down', 'dialer down', 'telephony down', 'telephony unavailable',
                'genesys down', 'avaya down', 'talkdesk down', 'ringcentral down',
                'five9 down', 'nice incontact down', 'cannot make calls', 'cannot receive calls'],
@@ -266,6 +286,7 @@ const FAQ = [
   },
 
   {
+    label: 'Restoring normal operations after downtime',
     keywords: ['system restored', 'back online', 'after outage', 'system back up', 'crm back',
                'after downtime', 'recovery', 'post downtime', 'what to do when system comes back'],
     answer:
@@ -277,6 +298,7 @@ const FAQ = [
   },
 
   {
+    label: 'Prolonged outage / Business Continuity Plan (BCP)',
     keywords: ['prolonged outage', 'outage 2 hours', 'long outage', 'bcp', 'business continuity',
                'extended outage', 'still down', 'major incident', 'hours downtime', 'p1 incident'],
     answer:
@@ -289,6 +311,7 @@ const FAQ = [
   // ── ESCALATION / TICKET MANAGEMENT ─────────────────────────────────────
 
   {
+    label: 'How to escalate a ticket to Tier 2',
     keywords: ['how to escalate', 'escalate ticket', 'tier 2', 'escalation', 'send to tier 2',
                'escalate case', 'escalation procedure', 'escalation steps', 'when to escalate',
                'move to specialist'],
@@ -302,6 +325,7 @@ const FAQ = [
   },
 
   {
+    label: 'Tier 3 / supervisor escalation (fraud, legal, VIP)',
     keywords: ['tier 3', 'supervisor escalation', 'escalate to supervisor', 'need supervisor',
                'supervisor approval', 'external escalation', 'fraud escalation', 'legal escalation',
                'vip escalation', 'enterprise escalation', 'data breach', 'unauthorized access'],
@@ -314,6 +338,7 @@ const FAQ = [
   },
 
   {
+    label: 'How to do a warm transfer',
     keywords: ['warm transfer', 'warm handoff', 'transfer with introduction', 'briefed transfer',
                'how to warm transfer', 'transfer distressed customer'],
     answer:
@@ -326,6 +351,7 @@ const FAQ = [
   },
 
   {
+    label: 'How to do a cold transfer',
     keywords: ['cold transfer', 'blind transfer', 'direct transfer', 'transfer without introduction',
                'straight transfer', 'cold handoff'],
     answer:
@@ -336,6 +362,7 @@ const FAQ = [
   },
 
   {
+    label: 'SLA breach / ticket overdue',
     keywords: ['sla breach', 'ticket overdue', 'sla at risk', 'red ticket', 'breach warning',
                'approaching sla', 'sla timer', 'response time exceeded', 'ticket late',
                'missing deadline', 'ticket deadline'],
@@ -347,6 +374,7 @@ const FAQ = [
   },
 
   {
+    label: 'Ticket status definitions (Open, Escalated, Resolved…)',
     keywords: ['ticket status', 'what does escalated mean', 'pending customer', 'ticket on hold',
                'closed vs resolved', 'ticket statuses', 'open status', 'ticket states', 'acw',
                'after call work', 'what is open status'],
@@ -363,6 +391,7 @@ const FAQ = [
   // ── IDENTITY VERIFICATION ────────────────────────────────────────────────
 
   {
+    label: 'How to verify customer identity (standard 2FA)',
     keywords: ['verify customer', 'identity verification', 'how to verify', 'security check',
                'id check', 'verify caller', 'customer verification', 'confirm identity',
                'account verification', '2fa check', 'security questions', 'verify account'],
@@ -376,6 +405,7 @@ const FAQ = [
   },
 
   {
+    label: 'Enhanced verification / OTP (high-risk actions)',
     keywords: ['otp', 'one time code', 'one time password', 'send otp', 'verification code',
                'enhanced verification', 'high risk verification', 'password reset verify',
                'payment change verify', 'otp not received', 'code not arriving'],
@@ -389,6 +419,7 @@ const FAQ = [
   },
 
   {
+    label: 'Third-party caller / not the account holder',
     keywords: ['third party', 'not account holder', 'calling on behalf', 'authorized contact',
                'someone else calling', 'power of attorney', 'third party caller',
                'caller not on account', 'authorized third party'],
@@ -400,6 +431,7 @@ const FAQ = [
   },
 
   {
+    label: 'Vulnerable or distressed customer cannot verify',
     keywords: ['vulnerable customer', 'confused customer', 'distressed customer', 'cannot verify',
                'customer struggling', 'cannot remember', 'elderly customer', 'welfare concern',
                'customer upset'],
@@ -413,6 +445,7 @@ const FAQ = [
   // ── NETWORK / VPN / AUTH ERRORS ─────────────────────────────────────────
 
   {
+    label: 'VPN not connecting / authentication failed',
     keywords: ['vpn', 'vpn not connecting', 'vpn failed', 'vpn error', 'vpn authentication',
                'cisco anyconnect', 'globalprotect', 'fortinet vpn', 'vpn disconnecting',
                'vpn credentials', 'remote access', 'working from home vpn'],
@@ -425,6 +458,7 @@ const FAQ = [
   },
 
   {
+    label: '2FA / MFA code not working',
     keywords: ['2fa', 'mfa', 'two factor', 'authenticator', 'mfa code', '2fa not working',
                'mfa failed', 'code rejected', 'otp invalid', 'google authenticator wrong',
                'backup codes', 'code not accepted', 'authenticator code wrong', 'mfa reset'],
@@ -438,6 +472,7 @@ const FAQ = [
   },
 
   {
+    label: 'SSL certificate error in browser',
     keywords: ['ssl error', 'certificate error', 'not private', 'connection not private',
                'ssl warning', 'padlock red', 'ERR_CERT', 'untrusted certificate',
                'https error', 'browser warning', 'certificate expired', 'proceed anyway'],
@@ -450,6 +485,7 @@ const FAQ = [
   },
 
   {
+    label: 'Active Directory / LDAP sync failure (multiple agents affected)',
     keywords: ['active directory', 'ad sync', 'ldap', 'domain controller', 'LDAP_BIND_FAILED',
                'AD_SYNC_ERROR', 'multiple agents locked', 'everyone cant login',
                'new accounts not working', 'sso broken for everyone', 'authentication service down'],
@@ -461,6 +497,7 @@ const FAQ = [
   },
 
   {
+    label: 'Webhook / integration not triggering',
     keywords: ['webhook', 'integration', 'zapier', 'automation', 'data not syncing',
                'slack notifications', 'workflow not running', '504 gateway timeout',
                'integration broken', 'ticket not auto assigned', 'webhook failed'],
@@ -472,6 +509,7 @@ const FAQ = [
   },
 
   {
+    label: 'API 500 Internal Server Error',
     keywords: ['api 500', 'internal server error', 'http 500', 'server error', 'api not working',
                'api calls failing', 'crm api error', '500 error', 'unhandled exception'],
     answer:
@@ -483,6 +521,7 @@ const FAQ = [
   },
 
   {
+    label: 'Internet / network completely down',
     keywords: ['network down', 'no internet', 'internet down', 'all websites down',
                'cannot connect to anything', 'network failure', 'lost all connectivity',
                'ERR_CONNECTION_REFUSED', 'all platforms down', 'network outage'],
@@ -498,14 +537,14 @@ const FAQ = [
 
 /**
  * Search the FAQ for the best match to a query string.
- * Returns { answer, matched: true } or { answer: null, matched: false }.
+ * Returns { answer, label, matched } or { answer: null, matched: false }.
  */
 export function searchFaq(query) {
   if (!query) return { answer: null, matched: false };
   const q = query.toLowerCase();
 
   let bestScore = 0;
-  let bestAnswer = null;
+  let bestEntry = null;
 
   for (const entry of FAQ) {
     let score = 0;
@@ -514,11 +553,19 @@ export function searchFaq(query) {
     }
     if (score > bestScore) {
       bestScore = score;
-      bestAnswer = entry.answer;
+      bestEntry = entry;
     }
   }
 
   return bestScore >= 1
-    ? { answer: bestAnswer, matched: true }
+    ? { answer: bestEntry.answer, label: bestEntry.label, matched: true }
     : { answer: null, matched: false };
+}
+
+/**
+ * Returns all FAQ topic labels for display in the "no match" fallback UI.
+ * Groups them by section for readability.
+ */
+export function getTopicList() {
+  return FAQ.map((e) => e.label);
 }

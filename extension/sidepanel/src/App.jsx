@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { searchFaq } from './offlineFaq.js';
+import { searchFaq, getTopicList } from './offlineFaq.js';
 
 const BACKEND_URL = 'http://127.0.0.1:8000';
 
@@ -79,6 +79,28 @@ function parseSteps(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Offline topic list — shown when no FAQ entry matches
+// ---------------------------------------------------------------------------
+
+function TopicList({ onSelect }) {
+  const topics = getTopicList();
+  return (
+    <div className="topic-list">
+      <p className="topic-list-heading">I can help with these topics while offline:</p>
+      <ul>
+        {topics.map((label, i) => (
+          <li key={i}>
+            <button className="topic-btn" onClick={() => onSelect(label)}>
+              {label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Source badge
 // ---------------------------------------------------------------------------
 
@@ -108,10 +130,11 @@ function StepList({ steps }) {
   );
 }
 
-function MessageBubble({ message, onFeedback, onRetry }) {
+function MessageBubble({ message, onFeedback, onRetry, onTopicSelect }) {
   const isAssistant = message.sender === 'assistant';
   const isError     = message.source === 'fallback';
-  const steps       = isAssistant ? parseSteps(message.text) : null;
+  const isTopics    = message.source === 'offline-topics';
+  const steps       = isAssistant && !isTopics ? parseSteps(message.text) : null;
 
   return (
     <div
@@ -120,14 +143,16 @@ function MessageBubble({ message, onFeedback, onRetry }) {
     >
       <div className={`message-bubble ${isError ? 'bubble-error' : ''}`}>
 
-        {/* Message content */}
-        {steps
-          ? <StepList steps={steps} />
-          : <p className="bubble-text"><InlineText text={message.text} /></p>
+        {/* Topic list for no-match offline responses */}
+        {isTopics
+          ? <TopicList onSelect={onTopicSelect} />
+          : steps
+            ? <StepList steps={steps} />
+            : <p className="bubble-text"><InlineText text={message.text} /></p>
         }
 
         {/* Source badge + feedback row — only on assistant messages */}
-        {isAssistant && message.id !== 'welcome' && (
+        {isAssistant && message.id !== 'welcome' && !isTopics && (
           <div className="bubble-footer">
             <SourceBadge source={message.source} />
 
@@ -302,11 +327,9 @@ export default function App() {
       setMessages((prev) => [...prev, {
         id:       Date.now() + 1,
         sender:   'assistant',
-        text:     matched
-          ? answer
-          : "I'm currently offline and couldn't find a matching procedure. Please check your connection or escalate to your supervisor.",
+        text:     matched ? answer : '',
         feedback: null,
-        source:   matched ? 'offline-cache' : 'fallback',
+        source:   matched ? 'offline-cache' : 'offline-topics',
         userText: trimmed,
       }]);
       setStatus('Offline');
@@ -323,6 +346,11 @@ export default function App() {
   // Retry — re-sends the original user query that produced an error message
   const handleRetry = useCallback((originalText) => {
     if (originalText) sendMessage(originalText);
+  }, [sendMessage]);
+
+  // Topic select — agent taps a topic from the offline list
+  const handleTopicSelect = useCallback((label) => {
+    sendMessage(label);
   }, [sendMessage]);
 
   // ---------------------------------------------------------------------------
@@ -398,6 +426,7 @@ export default function App() {
             message={msg}
             onFeedback={handleFeedback}
             onRetry={handleRetry}
+            onTopicSelect={handleTopicSelect}
           />
         ))}
 
