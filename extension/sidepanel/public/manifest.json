@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "AssistFlow",
+  "version": "0.1.0",
+  "description": "AI-assisted workplace support side panel for call center agents.",
+  "permissions": ["sidePanel", "storage", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "AssistFlow"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  }
+}
