@@ -4,9 +4,8 @@
 
 /* -------------------------------------------------------------------------
    Base — scoped entirely inside the side panel window.
-   The panel runs in its own iframe so there's no risk of leaking into the
-   host CRM page. Styles use rem units anchored to a fixed 14px base so the
-   panel looks consistent regardless of the host page's font-size settings.
+   rem units anchored to 14px so the panel looks consistent regardless of
+   the host CRM page's font-size settings.
    ------------------------------------------------------------------------- */
 
 :root {
@@ -18,19 +17,15 @@
   background: #f5f7fb;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  /* Chrome side panel minimum width is 180px, comfortable target is 320px */
   min-width: 240px;
 }
 
-/* Scrollbar — kept slim so it doesn't eat into the narrow panel width */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -61,9 +56,7 @@ html, body, #root {
   flex-shrink: 0;
 }
 
-.topbar-left {
-  min-width: 0; /* allow text truncation */
-}
+.topbar-left { min-width: 0; }
 
 .eyebrow {
   margin: 0 0 2px;
@@ -92,13 +85,11 @@ html, body, #root {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-
 .status-pill.online  { background: #dcfce7; color: #166534; }
 .status-pill.offline { background: #fee2e2; color: #991b1b; }
 
 /* -------------------------------------------------------------------------
    Selected-text banner
-   Appears just below the header when the agent highlights text on the CRM page.
    ------------------------------------------------------------------------- */
 .selected-banner {
   display: flex;
@@ -136,10 +127,9 @@ html, body, #root {
   cursor: pointer;
   padding: 4px 8px;
 }
-
-.banner-btn.use     { background: #2563eb; color: #fff; }
-.banner-btn.use:hover { background: #1d4ed8; }
-.banner-btn.dismiss { background: transparent; color: #64748b; font-size: 0.85rem; padding: 4px 6px; }
+.banner-btn.use           { background: #2563eb; color: #fff; }
+.banner-btn.use:hover     { background: #1d4ed8; }
+.banner-btn.dismiss       { background: transparent; color: #64748b; font-size: 0.85rem; padding: 4px 6px; }
 .banner-btn.dismiss:hover { color: #0f172a; }
 
 /* -------------------------------------------------------------------------
@@ -160,10 +150,8 @@ html, body, #root {
    ------------------------------------------------------------------------- */
 .message-row {
   display: flex;
-  /* Prevent bubbles from going wider than the panel on smallest widths */
   max-width: 100%;
 }
-
 .message-row.user      { justify-content: flex-end; }
 .message-row.assistant { justify-content: flex-start; }
 
@@ -190,12 +178,17 @@ html, body, #root {
   border-radius: 14px 14px 4px 14px;
 }
 
-.bubble-text {
-  margin: 0;
+/* Error bubble — fallback / backend unavailable */
+.message-bubble.bubble-error {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
 }
 
+.bubble-text { margin: 0; }
+
 /* -------------------------------------------------------------------------
-   Step list — rendered when the assistant reply contains numbered instructions
+   Step list
    ------------------------------------------------------------------------- */
 .steps-list {
   margin: 0;
@@ -204,20 +197,53 @@ html, body, #root {
   flex-direction: column;
   gap: 6px;
 }
-
-.steps-list li {
-  padding-left: 2px;
-}
+.steps-list li { padding-left: 2px; }
 
 /* -------------------------------------------------------------------------
-   Feedback row (thumbs up / down)
+   Bubble footer — source badge + feedback
    ------------------------------------------------------------------------- */
+.bubble-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Source badge */
+.source-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.source-rag     { background: #dbeafe; color: #1e40af; }
+.source-offline { background: #fef9c3; color: #854d0e; }
+.source-fallback{ background: #fee2e2; color: #991b1b; }
+
+/* Retry button */
+.retry-btn {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: transparent;
+  color: #9a3412;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.retry-btn:hover { background: #fff7ed; }
+
+/* Feedback buttons */
 .feedback-row {
   display: flex;
   gap: 4px;
-  margin-top: 7px;
-  padding-top: 7px;
-  border-top: 1px solid #f1f5f9;
+  margin-left: auto;
 }
 
 .feedback-btn {
@@ -230,14 +256,13 @@ html, body, #root {
   transition: background 0.15s, border-color 0.15s;
   line-height: 1.4;
 }
-
-.feedback-btn:hover:not(:disabled)  { background: #f1f5f9; }
-.feedback-btn:disabled              { cursor: default; opacity: 0.6; }
-.feedback-btn.active-up             { background: #dcfce7; border-color: #86efac; }
-.feedback-btn.active-down           { background: #fee2e2; border-color: #fca5a5; }
+.feedback-btn:hover:not(:disabled) { background: #f1f5f9; }
+.feedback-btn:disabled             { cursor: default; opacity: 0.6; }
+.feedback-btn.active-up            { background: #dcfce7; border-color: #86efac; }
+.feedback-btn.active-down          { background: #fee2e2; border-color: #fca5a5; }
 
 /* -------------------------------------------------------------------------
-   Loading animation — three bouncing dots
+   Loading dots
    ------------------------------------------------------------------------- */
 .loading-bubble {
   display: flex;
@@ -254,18 +279,17 @@ html, body, #root {
   background: #94a3b8;
   animation: bounce 1.2s infinite ease-in-out;
 }
-
-.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(1) { animation-delay: 0s;   }
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes bounce {
   0%, 80%, 100% { transform: translateY(0);    opacity: 0.4; }
-  40%           { transform: translateY(-6px); opacity: 1; }
+  40%           { transform: translateY(-6px); opacity: 1;   }
 }
 
 /* -------------------------------------------------------------------------
-   Composer (input + send button)
+   Composer
    ------------------------------------------------------------------------- */
 .composer {
   display: flex;
@@ -278,7 +302,7 @@ html, body, #root {
 
 .composer input {
   flex: 1;
-  min-width: 0; /* prevent overflow in narrow panel */
+  min-width: 0;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   background: #f8fafc;
@@ -288,16 +312,11 @@ html, body, #root {
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-
 .composer input:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
-
-.composer input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.composer input:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .composer button {
   flex-shrink: 0;
@@ -315,6 +334,5 @@ html, body, #root {
   justify-content: center;
   transition: background 0.15s, opacity 0.15s;
 }
-
 .composer button:hover:not(:disabled) { background: #1d4ed8; }
 .composer button:disabled { opacity: 0.45; cursor: not-allowed; }

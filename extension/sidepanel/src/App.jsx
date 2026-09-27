@@ -1,15 +1,12 @@
 /**
  * App.jsx — AssistFlow Side Panel
  *
- * Features:
- *  - On mount: sends PANEL_READY to background to fetch last known tab context
- *  - Listens for TAB_CONTEXT, PAGE_CONTEXT, TEXT_SELECTED, CONTEXT_MENU_QUERY
- *    messages from the background service worker / content script
- *  - Shows the active CRM platform in the header (e.g. "Salesforce", "Zendesk")
- *  - "Use selected text" banner when the agent highlights text on the host page
- *  - Formats assistant replies: numbered steps rendered as <ol>, plain text as <p>
- *  - Thumbs up / down feedback sent to POST /api/feedback
- *  - Online / Offline status pill
+ * Updated to reflect live system:
+ *  - Gemini 3.8 Flash returns markdown-style replies (bold, numbered lists)
+ *  - Source badge on each assistant bubble (rag / offline-cache / fallback)
+ *  - Retry button on error/fallback messages
+ *  - Improved step parser handles: "1. Step", "1) Step", "**1. Step**", "Step 1:"
+ *  - Bold text (**text**) rendered inline without a markdown library
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -21,24 +18,79 @@ const WELCOME_MESSAGE = {
   sender: 'assistant',
   text: "Hi, I'm AssistFlow. I can help with troubleshooting steps, SOP guidance, and downtime procedures. Ask me anything or highlight text on the page to send it as a query.",
   feedback: null,
+  source: null,
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Markdown-lite renderer
 // ---------------------------------------------------------------------------
 
 /**
- * Detects whether a string looks like a numbered list and splits it into steps.
- * Matches patterns like "1. ...", "1) ...", or "Step 1: ..."
+ * Strips leading markdown bold markers from a line.
+ * e.g. "**1. Do this**" → "1. Do this"
+ */
+function stripBold(text) {
+  return text.replace(/\*\*(.*?)\*\*/g, '$1');
+}
+
+/**
+ * Splits inline text into alternating plain/bold segments for rendering.
+ * "Check **this** carefully" → [{bold:false,text:"Check "},{bold:true,text:"this"},{bold:false,text:" carefully"}]
+ */
+function parseInline(text) {
+  const parts = [];
+  const regex = /\*\*(.*?)\*\*/g;
+  let last = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push({ bold: false, text: text.slice(last, match.index) });
+    parts.push({ bold: true, text: match[1] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push({ bold: false, text: text.slice(last) });
+  return parts.length ? parts : [{ bold: false, text }];
+}
+
+function InlineText({ text }) {
+  const parts = parseInline(text);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.bold ? <strong key={i}>{p.text}</strong> : <span key={i}>{p.text}</span>
+      )}
+    </>
+  );
+}
+
+/**
+ * Detects whether a reply is a numbered list and returns the steps.
+ * Handles Gemini output formats:
+ *   "1. Step"  "1) Step"  "**1. Step**"  "Step 1: ..."
  */
 function parseSteps(text) {
-  const lines = text.split('\n');
-  const stepPattern = /^(\d+[.):]|step\s+\d+[.):])[\s]*/i;
-  const steps = lines.filter((l) => stepPattern.test(l.trim()));
+  const lines = text.split('\n').map(l => stripBold(l.trim())).filter(Boolean);
+  const stepPattern = /^(\d+[.):]\s+|step\s+\d+[.:]\s*)/i;
+  const steps = lines.filter(l => stepPattern.test(l));
   if (steps.length >= 2) {
-    return steps.map((l) => l.replace(stepPattern, '').trim());
+    return steps.map(l => l.replace(stepPattern, '').trim());
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Source badge
+// ---------------------------------------------------------------------------
+
+const SOURCE_LABELS = {
+  'rag':           { label: 'AI · SOP',        cls: 'source-rag'     },
+  'offline-cache': { label: 'Offline cache',    cls: 'source-offline' },
+  'fallback':      { label: 'No connection',    cls: 'source-fallback'},
+};
+
+function SourceBadge({ source }) {
+  if (!source || source === null) return null;
+  const { label, cls } = SOURCE_LABELS[source] || { label: source, cls: 'source-rag' };
+  return <span className={`source-badge ${cls}`}>{label}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -49,44 +101,61 @@ function StepList({ steps }) {
   return (
     <ol className="steps-list" aria-label="Step-by-step instructions">
       {steps.map((step, i) => (
-        <li key={i}>{step}</li>
+        <li key={i}><InlineText text={step} /></li>
       ))}
     </ol>
   );
 }
 
-function MessageBubble({ message, onFeedback }) {
-  const steps = message.sender === 'assistant' ? parseSteps(message.text) : null;
+function MessageBubble({ message, onFeedback, onRetry }) {
+  const isAssistant = message.sender === 'assistant';
+  const isError     = message.source === 'fallback';
+  const steps       = isAssistant ? parseSteps(message.text) : null;
 
   return (
     <div
-      className={`message-row ${message.sender === 'assistant' ? 'assistant' : 'user'}`}
+      className={`message-row ${isAssistant ? 'assistant' : 'user'}`}
       role="listitem"
     >
-      <div className="message-bubble">
-        {steps ? <StepList steps={steps} /> : <p className="bubble-text">{message.text}</p>}
+      <div className={`message-bubble ${isError ? 'bubble-error' : ''}`}>
 
-        {/* Feedback controls — only on assistant messages, not on the welcome msg */}
-        {message.sender === 'assistant' && message.id !== 'welcome' && (
-          <div className="feedback-row" aria-label="Rate this response">
-            <button
-              className={`feedback-btn ${message.feedback === 'up' ? 'active-up' : ''}`}
-              onClick={() => onFeedback(message.id, 'up')}
-              aria-label="Helpful"
-              title="Helpful"
-              disabled={message.feedback !== null}
-            >
-              👍
-            </button>
-            <button
-              className={`feedback-btn ${message.feedback === 'down' ? 'active-down' : ''}`}
-              onClick={() => onFeedback(message.id, 'down')}
-              aria-label="Not helpful"
-              title="Not helpful"
-              disabled={message.feedback !== null}
-            >
-              👎
-            </button>
+        {/* Message content */}
+        {steps
+          ? <StepList steps={steps} />
+          : <p className="bubble-text"><InlineText text={message.text} /></p>
+        }
+
+        {/* Source badge + feedback row — only on assistant messages */}
+        {isAssistant && message.id !== 'welcome' && (
+          <div className="bubble-footer">
+            <SourceBadge source={message.source} />
+
+            {/* Retry button on error/fallback */}
+            {isError && onRetry && (
+              <button className="retry-btn" onClick={() => onRetry(message.userText)}>
+                ↺ Retry
+              </button>
+            )}
+
+            {/* Thumbs up/down — not shown on error messages */}
+            {!isError && (
+              <div className="feedback-row" aria-label="Rate this response">
+                <button
+                  className={`feedback-btn ${message.feedback === 'up' ? 'active-up' : ''}`}
+                  onClick={() => onFeedback(message.id, 'up')}
+                  aria-label="Helpful"
+                  title="Helpful"
+                  disabled={message.feedback !== null}
+                >👍</button>
+                <button
+                  className={`feedback-btn ${message.feedback === 'down' ? 'active-down' : ''}`}
+                  onClick={() => onFeedback(message.id, 'down')}
+                  aria-label="Not helpful"
+                  title="Not helpful"
+                  disabled={message.feedback !== null}
+                >👎</button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -98,7 +167,9 @@ function SelectedTextBanner({ text, onUse, onDismiss }) {
   if (!text) return null;
   return (
     <div className="selected-banner" role="status" aria-live="polite">
-      <span className="selected-preview">"{text.slice(0, 80)}{text.length > 80 ? '…' : ''}"</span>
+      <span className="selected-preview">
+        "{text.slice(0, 80)}{text.length > 80 ? '…' : ''}"
+      </span>
       <div className="selected-actions">
         <button className="banner-btn use" onClick={onUse}>Use as query</button>
         <button className="banner-btn dismiss" onClick={onDismiss} aria-label="Dismiss">✕</button>
@@ -112,15 +183,15 @@ function SelectedTextBanner({ text, onUse, onDismiss }) {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
-  const [input, setInput] = useState('');
-  const [status, setStatus] = useState('Online');
-  const [isLoading, setIsLoading] = useState(false);
-  const [platform, setPlatform] = useState('');
+  const [messages,     setMessages]     = useState([WELCOME_MESSAGE]);
+  const [input,        setInput]        = useState('');
+  const [status,       setStatus]       = useState('Online');
+  const [isLoading,    setIsLoading]    = useState(false);
+  const [platform,     setPlatform]     = useState('');
   const [selectedText, setSelectedText] = useState('');
 
   const chatEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const inputRef   = useRef(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -128,18 +199,16 @@ export default function App() {
   }, [messages, isLoading]);
 
   // ---------------------------------------------------------------------------
-  // On mount: announce PANEL_READY to get last known tab context
+  // Chrome runtime — PANEL_READY + message listeners
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!chrome?.runtime) return;
 
+    // Ask background for last known tab context
     chrome.runtime.sendMessage({ type: 'PANEL_READY' }, (response) => {
-      if (response?.context) {
-        applyTabContext(response.context);
-      }
+      if (response?.context) applyTabContext(response.context);
     });
 
-    // Listen for runtime messages from background + content scripts
     const handler = (message) => {
       if (message.type === 'TAB_CONTEXT' || message.type === 'PAGE_CONTEXT') {
         applyTabContext(message);
@@ -169,7 +238,7 @@ export default function App() {
     const trimmed = (text || '').trim();
     if (!trimmed || isLoading) return;
 
-    const userMsg = { id: Date.now(), sender: 'user', text: trimmed, feedback: null };
+    const userMsg = { id: Date.now(), sender: 'user', text: trimmed, feedback: null, source: null };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setSelectedText('');
@@ -185,25 +254,25 @@ export default function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      const assistantMsg = {
-        id: Date.now() + 1,
-        sender: 'assistant',
-        text: data.reply || 'The system responded but returned no guidance.',
-        feedback: null,
-        source: data.source,
+      setMessages((prev) => [...prev, {
+        id:        Date.now() + 1,
+        sender:    'assistant',
+        text:      data.reply || 'The system responded but returned no guidance.',
+        feedback:  null,
+        source:    data.source || 'rag',
         latency_ms: data.latency_ms,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+        userText:  trimmed,
+      }]);
       setStatus('Online');
     } catch {
-      const fallbackMsg = {
-        id: Date.now() + 2,
-        sender: 'assistant',
-        text: 'The backend is unavailable. Check that the local FastAPI server is running, then retry.',
+      setMessages((prev) => [...prev, {
+        id:       Date.now() + 2,
+        sender:   'assistant',
+        text:     'The backend is unavailable. Make sure the FastAPI server is running, then retry.',
         feedback: null,
-        source: 'fallback',
-      };
-      setMessages((prev) => [...prev, fallbackMsg]);
+        source:   'fallback',
+        userText: trimmed,
+      }]);
       setStatus('Offline');
     } finally {
       setIsLoading(false);
@@ -215,21 +284,23 @@ export default function App() {
     sendMessage(input);
   };
 
+  // Retry — re-sends the original user query that produced an error message
+  const handleRetry = useCallback((originalText) => {
+    if (originalText) sendMessage(originalText);
+  }, [sendMessage]);
+
   // ---------------------------------------------------------------------------
   // Feedback
   // ---------------------------------------------------------------------------
   const handleFeedback = useCallback(async (messageId, rating) => {
-    // Optimistically update UI
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, feedback: rating } : m))
     );
 
-    const msg = messages.find((m) => m.id === messageId);
-    if (!msg) return;
-
-    // Find the preceding user message to send as the query
+    const msg      = messages.find((m) => m.id === messageId);
     const msgIndex = messages.findIndex((m) => m.id === messageId);
-    const userMsg = messages.slice(0, msgIndex).reverse().find((m) => m.sender === 'user');
+    const userMsg  = messages.slice(0, msgIndex).reverse().find((m) => m.sender === 'user');
+    if (!msg) return;
 
     try {
       await fetch(`${BACKEND_URL}/api/feedback`, {
@@ -237,12 +308,12 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMsg?.text || '',
-          reply: msg.text,
-          rating: rating === 'up' ? 1 : 2,
+          reply:   msg.text,
+          rating:  rating === 'up' ? 1 : 2,
         }),
       });
     } catch {
-      // Feedback is best-effort — don't surface errors to the agent
+      // Best-effort — don't surface feedback errors to the agent
     }
   }, [messages]);
 
@@ -251,10 +322,11 @@ export default function App() {
   // ---------------------------------------------------------------------------
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="topbar" role="banner">
         <div className="topbar-left">
-          <p className="eyebrow">{platform ? `Active on ${platform}` : 'Workspace Support'}</p>
+          <p className="eyebrow">
+            {platform ? `Active on ${platform}` : 'Workspace Support'}
+          </p>
           <h1>AssistFlow</h1>
         </div>
         <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
@@ -262,17 +334,20 @@ export default function App() {
         </span>
       </header>
 
-      {/* Selected text banner */}
       <SelectedTextBanner
         text={selectedText}
         onUse={() => sendMessage(selectedText)}
         onDismiss={() => setSelectedText('')}
       />
 
-      {/* Chat area */}
       <main className="chat-panel" role="list" aria-label="Conversation">
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} onFeedback={handleFeedback} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            onFeedback={handleFeedback}
+            onRetry={handleRetry}
+          />
         ))}
 
         {isLoading && (
@@ -286,7 +361,6 @@ export default function App() {
         <div ref={chatEndRef} />
       </main>
 
-      {/* Input */}
       <form className="composer" onSubmit={handleSubmit} role="form" aria-label="Send a message">
         <input
           ref={inputRef}
