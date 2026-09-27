@@ -3,20 +3,113 @@
 @tailwind utilities;
 
 /* -------------------------------------------------------------------------
-   Base — scoped entirely inside the side panel window.
-   rem units anchored to 14px so the panel looks consistent regardless of
-   the host CRM page's font-size settings.
+   Design tokens — light mode (default)
+   All colours reference CSS variables so dark mode is a single class swap.
    ------------------------------------------------------------------------- */
-
 :root {
   font-size: 14px;
   font-family: Inter, 'Segoe UI', system-ui, sans-serif;
   font-weight: 400;
   line-height: 1.5;
-  color: #0f172a;
-  background: #f5f7fb;
+
+  /* Surface */
+  --bg-app:        linear-gradient(180deg, #f8faff 0%, #eef4ff 100%);
+  --bg-topbar:     rgba(255, 255, 255, 0.85);
+  --bg-bubble-ai:  #ffffff;
+  --bg-bubble-err: #fff7ed;
+  --bg-composer:   rgba(255, 255, 255, 0.9);
+  --bg-input:      #f8fafc;
+  --bg-banner:     #eff6ff;
+  --bg-footer:     transparent;
+
+  /* Borders */
+  --border-base:    #dfe7f7;
+  --border-bubble:  #e2e8f0;
+  --border-input:   #cbd5e1;
+  --border-footer:  #f1f5f9;
+  --border-banner:  #bfdbfe;
+  --border-err:     #fed7aa;
+  --border-fb:      #e2e8f0;
+
+  /* Text */
+  --text-primary:   #0f172a;
+  --text-muted:     #64748b;
+  --text-title:     #1e3a8a;
+  --text-banner:    #1d4ed8;
+  --text-err:       #9a3412;
+
+  /* Scrollbar */
+  --scrollbar-thumb: #cbd5e1;
+
+  /* Badges */
+  --badge-rag-bg:      #dbeafe;
+  --badge-rag-text:    #1e40af;
+  --badge-off-bg:      #fef9c3;
+  --badge-off-text:    #854d0e;
+  --badge-fail-bg:     #fee2e2;
+  --badge-fail-text:   #991b1b;
+
+  /* Feedback */
+  --fb-up-bg:    #dcfce7;
+  --fb-up-border:#86efac;
+  --fb-dn-bg:    #fee2e2;
+  --fb-dn-border:#fca5a5;
+  --fb-hover:    #f1f5f9;
+
+  /* Dark toggle button */
+  --toggle-bg:   #e2e8f0;
+  --toggle-text: #475569;
 }
 
+/* -------------------------------------------------------------------------
+   Dark mode tokens — applied when <html> has class="dark"
+   ------------------------------------------------------------------------- */
+html.dark {
+  --bg-app:        linear-gradient(180deg, #0f172a 0%, #0d1424 100%);
+  --bg-topbar:     rgba(15, 23, 42, 0.92);
+  --bg-bubble-ai:  #1e293b;
+  --bg-bubble-err: #2d1a0e;
+  --bg-composer:   rgba(15, 23, 42, 0.95);
+  --bg-input:      #0f172a;
+  --bg-banner:     #1e293b;
+  --bg-footer:     transparent;
+
+  --border-base:    #1e293b;
+  --border-bubble:  #334155;
+  --border-input:   #334155;
+  --border-footer:  #1e293b;
+  --border-banner:  #1d4ed8;
+  --border-err:     #7c3b1e;
+  --border-fb:      #334155;
+
+  --text-primary:   #e2e8f0;
+  --text-muted:     #94a3b8;
+  --text-title:     #93c5fd;
+  --text-banner:    #93c5fd;
+  --text-err:       #fdba74;
+
+  --scrollbar-thumb: #334155;
+
+  --badge-rag-bg:    #1e3a5f;
+  --badge-rag-text:  #7dd3fc;
+  --badge-off-bg:    #451a03;
+  --badge-off-text:  #fcd34d;
+  --badge-fail-bg:   #450a0a;
+  --badge-fail-text: #fca5a5;
+
+  --fb-up-bg:    #14532d;
+  --fb-up-border:#166534;
+  --fb-dn-bg:    #450a0a;
+  --fb-dn-border:#991b1b;
+  --fb-hover:    #1e293b;
+
+  --toggle-bg:   #334155;
+  --toggle-text: #94a3b8;
+}
+
+/* -------------------------------------------------------------------------
+   Base reset
+   ------------------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
@@ -24,11 +117,13 @@ html, body, #root {
   padding: 0;
   height: 100%;
   min-width: 240px;
+  color: var(--text-primary);
+  background: #0f172a; /* fallback while gradient loads */
 }
 
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 
 /* -------------------------------------------------------------------------
    Layout shell
@@ -37,7 +132,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(180deg, #f8faff 0%, #eef4ff 100%);
+  background: var(--bg-app);
   overflow: hidden;
 }
 
@@ -50,8 +145,8 @@ html, body, #root {
   justify-content: space-between;
   gap: 8px;
   padding: 12px 14px;
-  border-bottom: 1px solid #dfe7f7;
-  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid var(--border-base);
+  background: var(--bg-topbar);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
 }
@@ -63,7 +158,7 @@ html, body, #root {
   font-size: 0.71rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -73,20 +168,48 @@ html, body, #root {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: #1e3a8a;
+  color: var(--text-title);
   white-space: nowrap;
 }
 
-.status-pill {
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+/* Dark mode toggle */
+.dark-toggle {
+  background: var(--toggle-bg);
+  border: none;
+  border-radius: 8px;
+  color: var(--toggle-text);
+  font-size: 0.9rem;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.dark-toggle:hover { opacity: 0.8; }
+
+.status-pill {
   padding: 4px 9px;
   border-radius: 999px;
   font-size: 0.71rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 .status-pill.online  { background: #dcfce7; color: #166534; }
 .status-pill.offline { background: #fee2e2; color: #991b1b; }
+
+html.dark .status-pill.online  { background: #14532d; color: #86efac; }
+html.dark .status-pill.offline { background: #450a0a; color: #fca5a5; }
 
 /* -------------------------------------------------------------------------
    Selected-text banner
@@ -96,15 +219,15 @@ html, body, #root {
   align-items: flex-start;
   gap: 8px;
   padding: 8px 12px;
-  background: #eff6ff;
-  border-bottom: 1px solid #bfdbfe;
+  background: var(--bg-banner);
+  border-bottom: 1px solid var(--border-banner);
   flex-shrink: 0;
 }
 
 .selected-preview {
   flex: 1;
   font-size: 0.78rem;
-  color: #1d4ed8;
+  color: var(--text-banner);
   font-style: italic;
   overflow: hidden;
   display: -webkit-box;
@@ -112,25 +235,17 @@ html, body, #root {
   -webkit-box-orient: vertical;
 }
 
-.selected-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-  align-items: center;
-}
+.selected-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
 
 .banner-btn {
-  border: none;
-  border-radius: 8px;
-  font-size: 0.71rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 4px 8px;
+  border: none; border-radius: 8px;
+  font-size: 0.71rem; font-weight: 600;
+  cursor: pointer; padding: 4px 8px;
 }
 .banner-btn.use           { background: #2563eb; color: #fff; }
 .banner-btn.use:hover     { background: #1d4ed8; }
-.banner-btn.dismiss       { background: transparent; color: #64748b; font-size: 0.85rem; padding: 4px 6px; }
-.banner-btn.dismiss:hover { color: #0f172a; }
+.banner-btn.dismiss       { background: transparent; color: var(--text-muted); font-size: 0.85rem; padding: 4px 6px; }
+.banner-btn.dismiss:hover { color: var(--text-primary); }
 
 /* -------------------------------------------------------------------------
    Chat panel
@@ -148,10 +263,7 @@ html, body, #root {
 /* -------------------------------------------------------------------------
    Message rows + bubbles
    ------------------------------------------------------------------------- */
-.message-row {
-  display: flex;
-  max-width: 100%;
-}
+.message-row { display: flex; max-width: 100%; }
 .message-row.user      { justify-content: flex-end; }
 .message-row.assistant { justify-content: flex-start; }
 
@@ -166,9 +278,9 @@ html, body, #root {
 }
 
 .message-row.assistant .message-bubble {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  color: #0f172a;
+  background: var(--bg-bubble-ai);
+  border: 1px solid var(--border-bubble);
+  color: var(--text-primary);
   border-radius: 4px 14px 14px 14px;
 }
 
@@ -178,11 +290,10 @@ html, body, #root {
   border-radius: 14px 14px 4px 14px;
 }
 
-/* Error bubble — fallback / backend unavailable */
 .message-bubble.bubble-error {
-  background: #fff7ed;
-  border-color: #fed7aa;
-  color: #9a3412;
+  background: var(--bg-bubble-err);
+  border-color: var(--border-err);
+  color: var(--text-err);
 }
 
 .bubble-text { margin: 0; }
@@ -209,10 +320,9 @@ html, body, #root {
   gap: 6px;
   margin-top: 8px;
   padding-top: 7px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--border-footer);
 }
 
-/* Source badge */
 .source-badge {
   display: inline-block;
   padding: 2px 7px;
@@ -221,45 +331,40 @@ html, body, #root {
   font-weight: 600;
   letter-spacing: 0.03em;
 }
-.source-rag     { background: #dbeafe; color: #1e40af; }
-.source-offline { background: #fef9c3; color: #854d0e; }
-.source-fallback{ background: #fee2e2; color: #991b1b; }
+.source-rag     { background: var(--badge-rag-bg);  color: var(--badge-rag-text);  }
+.source-offline { background: var(--badge-off-bg);  color: var(--badge-off-text);  }
+.source-fallback{ background: var(--badge-fail-bg); color: var(--badge-fail-text); }
 
-/* Retry button */
 .retry-btn {
-  border: 1px solid #fed7aa;
+  border: 1px solid var(--border-err);
   border-radius: 8px;
   background: transparent;
-  color: #9a3412;
+  color: var(--text-err);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 2px 9px;
   cursor: pointer;
   transition: background 0.15s;
 }
-.retry-btn:hover { background: #fff7ed; }
+.retry-btn:hover { background: var(--bg-bubble-err); }
 
-/* Feedback buttons */
-.feedback-row {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-}
+.feedback-row { display: flex; gap: 4px; margin-left: auto; }
 
 .feedback-btn {
   background: none;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-fb);
   border-radius: 8px;
   padding: 2px 7px;
   font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   line-height: 1.4;
+  color: var(--text-primary);
 }
-.feedback-btn:hover:not(:disabled) { background: #f1f5f9; }
+.feedback-btn:hover:not(:disabled) { background: var(--fb-hover); }
 .feedback-btn:disabled             { cursor: default; opacity: 0.6; }
-.feedback-btn.active-up            { background: #dcfce7; border-color: #86efac; }
-.feedback-btn.active-down          { background: #fee2e2; border-color: #fca5a5; }
+.feedback-btn.active-up            { background: var(--fb-up-bg); border-color: var(--fb-up-border); }
+.feedback-btn.active-down          { background: var(--fb-dn-bg); border-color: var(--fb-dn-border); }
 
 /* -------------------------------------------------------------------------
    Loading dots
@@ -272,9 +377,15 @@ html, body, #root {
   min-width: 52px;
 }
 
+.loading-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-left: 4px;
+  font-style: italic;
+}
+
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: #94a3b8;
   animation: bounce 1.2s infinite ease-in-out;
@@ -295,20 +406,20 @@ html, body, #root {
   display: flex;
   gap: 6px;
   padding: 10px 12px 14px;
-  border-top: 1px solid #dfe7f7;
-  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid var(--border-base);
+  background: var(--bg-composer);
   flex-shrink: 0;
 }
 
 .composer input {
   flex: 1;
   min-width: 0;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-input);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--bg-input);
   padding: 9px 11px;
   font-size: 0.86rem;
-  color: #0f172a;
+  color: var(--text-primary);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -320,18 +431,12 @@ html, body, #root {
 
 .composer button {
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 10px;
-  background: #2563eb;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 700;
+  width: 38px; height: 38px;
+  border: none; border-radius: 10px;
+  background: #2563eb; color: #fff;
+  font-size: 1.1rem; font-weight: 700;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   transition: background 0.15s, opacity 0.15s;
 }
 .composer button:hover:not(:disabled) { background: #1d4ed8; }

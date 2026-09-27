@@ -189,9 +189,23 @@ export default function App() {
   const [isLoading,    setIsLoading]    = useState(false);
   const [platform,     setPlatform]     = useState('');
   const [selectedText, setSelectedText] = useState('');
+  const [darkMode,     setDarkMode]     = useState(() => {
+    // Restore preference from storage; default to system preference
+    try {
+      const stored = localStorage.getItem('assistflow-dark');
+      if (stored !== null) return stored === 'true';
+    } catch { /* storage may be unavailable */ }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
   const chatEndRef = useRef(null);
   const inputRef   = useRef(null);
+
+  // Apply / remove dark class on <html>
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    try { localStorage.setItem('assistflow-dark', String(darkMode)); } catch { /* ignore */ }
+  }, [darkMode]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -245,11 +259,16 @@ export default function App() {
     setIsLoading(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 30000); // 30s — Gemini can be slow
+
       const res = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: trimmed }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -264,11 +283,14 @@ export default function App() {
         userText:  trimmed,
       }]);
       setStatus('Online');
-    } catch {
+    } catch (err) {
+      const isTimeout = err?.name === 'AbortError';
       setMessages((prev) => [...prev, {
         id:       Date.now() + 2,
         sender:   'assistant',
-        text:     'The backend is unavailable. Make sure the FastAPI server is running, then retry.',
+        text:     isTimeout
+          ? 'The request timed out — the AI is taking longer than usual. Please retry in a moment.'
+          : 'Could not reach the backend. Make sure the FastAPI server is running, then retry.',
         feedback: null,
         source:   'fallback',
         userText: trimmed,
@@ -329,9 +351,19 @@ export default function App() {
           </p>
           <h1>AssistFlow</h1>
         </div>
-        <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
-          {status}
-        </span>
+        <div className="topbar-right">
+          <button
+            className="dark-toggle"
+            onClick={() => setDarkMode(d => !d)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Light mode' : 'Dark mode'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+          <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
+            {status}
+          </span>
+        </div>
       </header>
 
       <SelectedTextBanner
