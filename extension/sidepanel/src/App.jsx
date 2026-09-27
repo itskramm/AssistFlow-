@@ -1,18 +1,21 @@
 /**
  * App.jsx — AssistFlow Side Panel
  *
- * Updated to reflect live system:
- *  - Gemini 3.8 Flash returns markdown-style replies (bold, numbered lists)
- *  - Source badge on each assistant bubble (rag / offline-cache / fallback)
- *  - Retry button on error/fallback messages
- *  - Improved step parser handles: "1. Step", "1) Step", "**1. Step**", "Step 1:"
- *  - Bold text (**text**) rendered inline without a markdown library
+ * Offline detection:
+ *  - Tracks connectivity in an isOffline ref so consecutive offline queries
+ *    skip the backend fetch entirely and answer from the local FAQ instantly.
+ *  - Uses a 5s fetch timeout (down from 30s) so the first offline failure
+ *    is detected quickly rather than hanging.
+ *  - Polls GET /api/health every 30s while offline to auto-recover.
+ *  - When back online, clears the offline flag and resumes normal flow.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { searchFaq, getTopicList } from './offlineFaq.js';
 
-const BACKEND_URL = 'http://127.0.0.1:8000';
+const BACKEND_URL      = 'http://127.0.0.1:8000';
+const FETCH_TIMEOUT_MS = 5000;   // max wait before treating backend as unreachable
+const HEALTH_POLL_MS   = 30000;  // how often to re-probe when offline
 
 const WELCOME_MESSAGE = {
   id: 'welcome',
@@ -215,9 +218,8 @@ export default function App() {
   const [isLoading,    setIsLoading]    = useState(false);
   const [platform,     setPlatform]     = useState('');
   const [selectedText, setSelectedText] = useState('');
-  const [pageContext,  setPageContext]   = useState(null); // live CRM ticket data
+  const [pageContext,  setPageContext]   = useState(null);
   const [darkMode,     setDarkMode]     = useState(() => {
-    // Restore preference from storage; default to system preference
     try {
       const stored = localStorage.getItem('assistflow-dark');
       if (stored !== null) return stored === 'true';
@@ -228,11 +230,45 @@ export default function App() {
   const chatEndRef = useRef(null);
   const inputRef   = useRef(null);
 
+  // Connectivity ref — does NOT cause re-renders, used only in sendMessage logic.
+  // true  = backend known unreachable, serve FAQ instantly
+  // false = backend presumed reachable, attempt fetch
+  const isOffline = useRef(false);
+
   // Apply / remove dark class on <html>
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     try { localStorage.setItem('assistflow-dark', String(darkMode)); } catch { /* ignore */ }
   }, [darkMode]);
+
+  // Health poll — while offline, probe /api/health every 30s.
+  // When the backend responds, clear the offline flag and restore the status pill.
+  useEffect(() => {
+    let timer = null;
+
+    const probe = async () => {
+      if (!isOffline.current) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          isOffline.current = false;
+          setStatus('Online');
+        }
+      } catch {
+        // Still offline — try again on next tick
+      } finally {
+        if (isOffline.current) {
+          timer = setTimeout(probe, HEALTH_POLL_MS);
+        }
+      }
+    };
+
+    if (status === 'Offline') {
+      timer = setTimeout(probe, HEALTH_POLL_MS);
+    }
+
+    return () => clearTimeout(timer);
+  }, [status]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -276,7 +312,12 @@ export default function App() {
   }
 
   // ---------------------------------------------------------------------------
-  // Send a message to the backend
+  // Send a message — offline-aware
+  //
+  // If isOffline.current is true (backend known unreachable), skip the fetch
+  // entirely and answer from the local FAQ immediately.
+  // On first failure, mark offline, reduce timeout to FETCH_TIMEOUT_MS so
+  // subsequent first-attempt failures are fast, and start the health poll.
   // ---------------------------------------------------------------------------
   const sendMessage = useCallback(async (text) => {
     const trimmed = (text || '').trim();
@@ -288,7 +329,22 @@ export default function App() {
     setSelectedText('');
     setIsLoading(true);
 
-    // Build request body — attach live CRM page context if available
+    // ── Fast path: already know we're offline ────────────────────────────
+    if (isOffline.current) {
+      const { answer, matched } = searchFaq(trimmed);
+      setMessages((prev) => [...prev, {
+        id:       Date.now() + 1,
+        sender:   'assistant',
+        text:     matched ? answer : '',
+        feedback: null,
+        source:   matched ? 'offline-cache' : 'offline-topics',
+        userText: trimmed,
+      }]);
+      setIsLoading(false);
+      return;
+    }
+
+    // ── Normal path: try the backend ─────────────────────────────────────
     const body = { message: trimmed };
     if (pageContext && Object.keys(pageContext).length > 0) {
       body.page_context = pageContext;
@@ -296,7 +352,7 @@ export default function App() {
 
     try {
       const controller = new AbortController();
-      const timeoutId  = setTimeout(() => controller.abort(), 30000);
+      const timeoutId  = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
       const res = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
@@ -309,6 +365,8 @@ export default function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
+      // Successful response — ensure offline flag is clear
+      isOffline.current = false;
       setMessages((prev) => [...prev, {
         id:         Date.now() + 1,
         sender:     'assistant',
@@ -318,11 +376,12 @@ export default function App() {
         latency_ms: data.latency_ms,
         userText:   trimmed,
       }]);
-      // Reflect actual connectivity state — backend may have served from cache
       setStatus(data.source === 'rag' ? 'Online' : 'Offline');
     } catch {
-      // Backend unreachable or timed out — answer instantly from the local FAQ.
-      // No second network request needed.
+      // ── Fetch failed — mark offline, serve FAQ instantly ───────────────
+      isOffline.current = true;
+      setStatus('Offline');
+
       const { answer, matched } = searchFaq(trimmed);
       setMessages((prev) => [...prev, {
         id:       Date.now() + 1,
@@ -332,7 +391,6 @@ export default function App() {
         source:   matched ? 'offline-cache' : 'offline-topics',
         userText: trimmed,
       }]);
-      setStatus('Offline');
     } finally {
       setIsLoading(false);
     }
