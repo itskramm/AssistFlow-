@@ -292,7 +292,8 @@ export default function App() {
         latency_ms: data.latency_ms,
         userText:   trimmed,
       }]);
-      setStatus('Online');
+      // Reflect actual connectivity state — backend may have served from cache
+      setStatus(data.source === 'rag' ? 'Online' : 'Offline');
     } catch (err) {
       // /api/chat failed (timeout, backend unreachable, or network error).
       // Try the offline-query endpoint as a last resort — it only reads SQLite

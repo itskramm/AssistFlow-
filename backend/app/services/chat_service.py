@@ -58,15 +58,16 @@ def _is_network_error(exc: Exception) -> bool:
     return any(marker in msg for marker in _NETWORK_ERRORS)
 
 
-def _check_internet(host: str = "8.8.8.8", port: int = 53, timeout: float = 2.0) -> bool:
+def _check_internet(host: str = "8.8.8.8", port: int = 53, timeout: float = 1.5) -> bool:
     """
     Fast connectivity probe: try to open a TCP socket to Google's DNS.
+    Uses an explicit per-connection timeout (NOT setdefaulttimeout, which
+    is a global mutation that can affect other sockets on the same thread).
     Returns True if internet is reachable, False otherwise.
     Runs synchronously — call via asyncio.to_thread().
     """
     try:
-        socket.setdefaulttimeout(timeout)
-        with socket.create_connection((host, port)):
+        with socket.create_connection((host, port), timeout=timeout):
             return True
     except OSError:
         return False
