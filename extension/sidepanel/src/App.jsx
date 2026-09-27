@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { searchFaq } from './offlineFaq.js';
 
 const BACKEND_URL = 'http://127.0.0.1:8000';
 
@@ -294,43 +295,21 @@ export default function App() {
       }]);
       // Reflect actual connectivity state — backend may have served from cache
       setStatus(data.source === 'rag' ? 'Online' : 'Offline');
-    } catch (err) {
-      // /api/chat failed (timeout, backend unreachable, or network error).
-      // Try the offline-query endpoint as a last resort — it only reads SQLite
-      // and works even when Gemini / internet is down.
-      try {
-        const offlineRes = await fetch(`${BACKEND_URL}/api/offline-query`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: trimmed }),
-        });
-        if (!offlineRes.ok) throw new Error(`HTTP ${offlineRes.status}`);
-        const offlineData = await offlineRes.json();
-
-        setMessages((prev) => [...prev, {
-          id:       Date.now() + 1,
-          sender:   'assistant',
-          text:     offlineData.reply,
-          feedback: null,
-          source:   offlineData.source || 'offline-cache',
-          userText: trimmed,
-        }]);
-        setStatus('Offline');
-      } catch {
-        // Backend is completely unreachable — nothing we can do server-side
-        const isTimeout = err?.name === 'AbortError';
-        setMessages((prev) => [...prev, {
-          id:       Date.now() + 2,
-          sender:   'assistant',
-          text:     isTimeout
-            ? 'The request timed out. Please retry in a moment.'
-            : 'Could not reach the backend. Make sure the FastAPI server is running, then retry.',
-          feedback: null,
-          source:   'fallback',
-          userText: trimmed,
-        }]);
-        setStatus('Offline');
-      }
+    } catch {
+      // Backend unreachable or timed out — answer instantly from the local FAQ.
+      // No second network request needed.
+      const { answer, matched } = searchFaq(trimmed);
+      setMessages((prev) => [...prev, {
+        id:       Date.now() + 1,
+        sender:   'assistant',
+        text:     matched
+          ? answer
+          : "I'm currently offline and couldn't find a matching procedure. Please check your connection or escalate to your supervisor.",
+        feedback: null,
+        source:   matched ? 'offline-cache' : 'fallback',
+        userText: trimmed,
+      }]);
+      setStatus('Offline');
     } finally {
       setIsLoading(false);
     }
