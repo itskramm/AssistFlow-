@@ -14,7 +14,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-GEMINI_API_KEY:  str = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY:  str = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY", "")
 CHROMA_DB_PATH:  str = os.getenv("CHROMA_DB_PATH", str(BASE_DIR / "data" / "chroma"))
 OFFLINE_DB_PATH: str = os.getenv("OFFLINE_DB_PATH", str(BASE_DIR / "data" / "offline_cache" / "offline.db"))
 FASTAPI_HOST:    str = os.getenv("FASTAPI_HOST", "0.0.0.0")
