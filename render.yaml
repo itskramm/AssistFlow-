@@ -1,0 +1,28 @@
+# Render Blueprint for AssistFlow Backend
+# This file enables one-click deployment to Render
+
+services:
+  - type: web
+    name: assistflow-backend
+    runtime: python
+    region: oregon  # Choose: oregon, frankfurt, ohio, singapore
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && cd ../scripts && python ingest_knowledge.py
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: CHROMA_PERSIST_DIR
+        value: /opt/render/project/src/data/chroma
+      - key: KNOWLEDGE_DIR
+        value: /opt/render/project/src/data/knowledge
+      - key: OFFLINE_DB_PATH
+        value: /opt/render/project/src/data/offline_cache/offline.db
+      - key: PORT
+        value: "10000"
+      - key: GOOGLE_API_KEY
+        sync: false  # Mark as secret (set manually in dashboard)
+    healthCheckPath: /api/health
+    autoDeploy: true
