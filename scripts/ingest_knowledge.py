@@ -73,9 +73,12 @@ def chunk_documents(documents: list[dict]) -> list[dict]:
 
 
 def ingest() -> None:
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY", "")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY is not set. Check backend/.env.")
+        print("⚠️  WARNING: GOOGLE_API_KEY not set. Skipping knowledge ingestion.")
+        print("   Knowledge base will be empty until you set the API key and re-run this script.")
+        print("   The API will use offline FAQ fallback mode.")
+        return
 
     print(f"\n=== AssistFlow Knowledge Ingestion ===")
     print(f"Knowledge dir : {KNOWLEDGE_DIR}")
