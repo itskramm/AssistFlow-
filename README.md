@@ -78,6 +78,7 @@ Chrome Extension                 Local FAQ search
 AssistFlow/
 ├── README.md
 ├── TESTING.md                  ← comprehensive testing guide (backend, offline FAQ, UI)
+├── WEBAPP.md                   ← web application documentation and deployment guide
 ├── .gitignore
 ├── module_by_module_tech_stack_breakdown.md   ← development checklist
 ├── project_guidelines_and_context.md          ← thesis context & rules
@@ -119,12 +120,25 @@ AssistFlow/
 │       │   └── background.js   ← service worker (auto-open, context menu)
 │       ├── src/
 │       │   ├── App.jsx         ← main side panel UI + offline detection logic
-│       │   ├── offlineFaq.js   ← 35-entry local FAQ + searchFaq() + getTopicList()
+│       │   ├── offlineFaq.js   ← 39-entry local FAQ + searchFaq() + getTopicList()
 │       │   ├── content.js      ← injected into CRM pages
 │       │   ├── index.css       ← Tailwind + custom styles
 │       │   └── main.jsx        ← React entry point
 │       ├── vite.config.js
 │       └── package.json
+│
+├── webapp/                     ← standalone web application (same functionality, no extension needed)
+│   ├── public/
+│   │   └── favicon.svg
+│   ├── src/
+│   │   ├── App.jsx            ← adapted from extension (no Chrome APIs)
+│   │   ├── main.jsx           ← entry point with layout wrapper
+│   │   ├── index.css          ← same styles + web-specific layout
+│   │   └── offlineFaq.js      ← same FAQ as extension
+│   ├── dist/                  ← production build output
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   └── package.json
 │
 └── scripts/
     ├── ingest_knowledge.py     ← embed SOPs → ChromaDB
@@ -154,7 +168,9 @@ curl http://127.0.0.1:8000/api/health
 # → {"status": "ok", "service": "assistflow-backend"}
 ```
 
-**2. Open Chrome** and navigate to any supported CRM — the side panel opens automatically. On any other page, click the AssistFlow icon in the toolbar.
+**2a. Use the Chrome Extension**
+
+Open Chrome and navigate to any supported CRM — the side panel opens automatically. On any other page, click the AssistFlow icon in the toolbar.
 
 > Add `--reload` if you're actively changing backend code:
 > ```bash
@@ -162,6 +178,17 @@ curl http://127.0.0.1:8000/api/health
 > ```
 
 The extension already has the local FAQ bundled. **It works offline from the moment it's installed** — no backend required for the FAQ.
+
+**2b. Use the Web Application**
+
+Start the standalone web app (no extension needed):
+
+```bash
+cd webapp
+npm run dev
+```
+
+Open http://localhost:3000 in any browser. See **[WEBAPP.md](WEBAPP.md)** for deployment options and configuration.
 
 ---
 
@@ -266,10 +293,17 @@ This produces a `dist/` folder ready to be loaded into Chrome.
 
 ### Step 8 — Use AssistFlow
 
+**Chrome Extension:**
 - Navigate to any supported CRM — the side panel opens automatically.
 - Click the AssistFlow icon on any other page to open it manually.
 - Type a question, or highlight text on the page and click **"Use as query"**.
 - Right-click any selected text and choose **"Ask AssistFlow"** for a quick query.
+
+**Web Application:**
+- Run `cd webapp && npm run dev`
+- Open http://localhost:3000
+- Type your questions in the chat interface
+- See **[WEBAPP.md](WEBAPP.md)** for full documentation
 
 ---
 
