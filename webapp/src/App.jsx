@@ -1,10 +1,10 @@
 /**
  * App.jsx — AssistFlow Web Application
  *
- * ChatGPT/Gemini-style layout:
- *   - Home screen: centred greeting + big input bar + suggestion chips
- *   - On first send: sidebar slides in with the full conversation
- *   - Floating 💬 button always visible at bottom-right (rendered at root)
+ * ChatGPT-style layout:
+ *   - Home: centred greeting + input bar + suggestion chips
+ *   - On first send: transitions to full-page chat (messages above, input pinned at bottom)
+ *   - No sidebar — the main page IS the chat, just like ChatGPT
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -14,21 +14,13 @@ const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow
 const FETCH_TIMEOUT_MS = 15000;
 const HEALTH_POLL_MS   = 30000;
 
-const WELCOME_MESSAGE = {
-  id: 'welcome',
-  sender: 'assistant',
-  text: "Hi, I'm AssistFlow. I can help with troubleshooting steps, SOP guidance, and downtime procedures. Ask me anything!",
-  feedback: null,
-  source: null,
-};
-
 const SUGGESTIONS = [
-  { icon: '🔑', label: 'CRM password reset',     query: 'How do I reset my CRM password?' },
-  { icon: '📞', label: 'Call quality issues',     query: 'Call quality issues on my headset' },
-  { icon: '📋', label: 'Escalate a ticket',       query: 'How do I escalate a ticket?' },
-  { icon: '🆔', label: 'Identity verification',   query: 'Customer identity verification steps' },
-  { icon: '🌐', label: 'VPN not connecting',      query: 'VPN disconnected, how do I reconnect?' },
-  { icon: '⚡', label: 'System running slow',     query: 'My system is running slow' },
+  { icon: '🔑', label: 'CRM password reset',   query: 'How do I reset my CRM password?' },
+  { icon: '📞', label: 'Call quality issues',   query: 'Call quality issues on my headset' },
+  { icon: '📋', label: 'Escalate a ticket',     query: 'How do I escalate a ticket?' },
+  { icon: '🆔', label: 'Identity verification', query: 'Customer identity verification steps' },
+  { icon: '🌐', label: 'VPN not connecting',    query: 'VPN disconnected, how do I reconnect?' },
+  { icon: '⚡', label: 'System running slow',   query: 'My system is running slow' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -72,7 +64,7 @@ function parseSteps(text) {
 function TopicList({ onSelect }) {
   return (
     <div className="topic-list">
-      <p className="topic-list-heading">I can help with these topics while offline:</p>
+      <p className="topic-list-heading">Available topics while offline:</p>
       <ul>
         {getTopicList().map((label, i) => (
           <li key={i}><button className="topic-btn" onClick={() => onSelect(label)}>{label}</button></li>
@@ -98,35 +90,63 @@ function SourceBadge({ source }) {
 }
 
 // ---------------------------------------------------------------------------
-// Message bubble
+// Message row — ChatGPT style: user right, assistant left with avatar
 // ---------------------------------------------------------------------------
-function MessageBubble({ message, onFeedback, onRetry, onTopicSelect }) {
+function MessageRow({ message, onFeedback, onRetry, onTopicSelect }) {
+  const isUser      = message.sender === 'user';
   const isAssistant = message.sender === 'assistant';
   const isError     = message.source === 'fallback';
   const isTopics    = message.source === 'offline-topics';
   const steps       = isAssistant && !isTopics ? parseSteps(message.text) : null;
 
+  if (isUser) {
+    return (
+      <div className="msg-row msg-user">
+        <div className="msg-bubble-user">
+          <InlineText text={message.text} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`message-row ${isAssistant ? 'assistant' : 'user'}`} role="listitem">
-      <div className={`message-bubble ${isError ? 'bubble-error' : ''}`}>
-        {isTopics
-          ? <TopicList onSelect={onTopicSelect} />
-          : steps
-            ? <ol className="steps-list">{steps.map((s, i) => <li key={i}><InlineText text={s} /></li>)}</ol>
-            : <p className="bubble-text"><InlineText text={message.text} /></p>
-        }
-        {isAssistant && message.id !== 'welcome' && !isTopics && (
-          <div className="bubble-footer">
+    <div className="msg-row msg-assistant">
+      {/* Avatar */}
+      <div className="msg-avatar">
+        <img src="/bubble-logo.png" alt="AssistFlow" />
+      </div>
+
+      <div className="msg-body">
+        <div className={`msg-bubble-assistant ${isError ? 'msg-error' : ''}`}>
+          {isTopics
+            ? <TopicList onSelect={onTopicSelect} />
+            : steps
+              ? <ol className="steps-list">{steps.map((s, i) => <li key={i}><InlineText text={s} /></li>)}</ol>
+              : <p className="bubble-text"><InlineText text={message.text} /></p>
+          }
+        </div>
+
+        {/* Footer: source + feedback */}
+        {message.id !== 'welcome' && !isTopics && (
+          <div className="msg-footer">
             <SourceBadge source={message.source} />
             {isError && onRetry && (
               <button className="retry-btn" onClick={() => onRetry(message.userText)}>↺ Retry</button>
             )}
             {!isError && (
               <div className="feedback-row">
-                <button className={`feedback-btn ${message.feedback === 'up'   ? 'active-up'   : ''}`}
-                  onClick={() => onFeedback(message.id, 'up')}   disabled={message.feedback !== null} aria-label="Helpful">👍</button>
-                <button className={`feedback-btn ${message.feedback === 'down' ? 'active-down' : ''}`}
-                  onClick={() => onFeedback(message.id, 'down')} disabled={message.feedback !== null} aria-label="Not helpful">👎</button>
+                <button
+                  className={`feedback-btn ${message.feedback === 'up' ? 'active-up' : ''}`}
+                  onClick={() => onFeedback(message.id, 'up')}
+                  disabled={message.feedback !== null}
+                  aria-label="Helpful"
+                >👍</button>
+                <button
+                  className={`feedback-btn ${message.feedback === 'down' ? 'active-down' : ''}`}
+                  onClick={() => onFeedback(message.id, 'down')}
+                  disabled={message.feedback !== null}
+                  aria-label="Not helpful"
+                >👎</button>
               </div>
             )}
           </div>
@@ -137,15 +157,33 @@ function MessageBubble({ message, onFeedback, onRetry, onTopicSelect }) {
 }
 
 // ---------------------------------------------------------------------------
+// Typing indicator
+// ---------------------------------------------------------------------------
+function TypingRow() {
+  return (
+    <div className="msg-row msg-assistant">
+      <div className="msg-avatar">
+        <img src="/bubble-logo.png" alt="AssistFlow" />
+      </div>
+      <div className="msg-body">
+        <div className="msg-bubble-assistant loading-bubble">
+          <span className="dot" /><span className="dot" /><span className="dot" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
 export default function App() {
-  const [messages,    setMessages]    = useState([WELCOME_MESSAGE]);
-  const [input,       setInput]       = useState('');
-  const [status,      setStatus]      = useState('Online');
-  const [isLoading,   setIsLoading]   = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode,    setDarkMode]    = useState(() => {
+  const [messages,  setMessages]  = useState([]);
+  const [input,     setInput]     = useState('');
+  const [status,    setStatus]    = useState('Online');
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatMode,  setChatMode]  = useState(false); // false = home, true = chat
+  const [darkMode,  setDarkMode]  = useState(() => {
     try {
       const s = localStorage.getItem('assistflow-dark');
       if (s !== null) return s === 'true';
@@ -153,15 +191,16 @@ export default function App() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  const chatEndRef = useRef(null);
-  const inputRef   = useRef(null);
-  const isOffline  = useRef(false);
+  const chatEndRef  = useRef(null);
+  const inputRef    = useRef(null);
+  const isOffline   = useRef(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     try { localStorage.setItem('assistflow-dark', String(darkMode)); } catch { /**/ }
   }, [darkMode]);
 
+  // Health poll when offline
   useEffect(() => {
     let timer = null;
     const probe = async () => {
@@ -176,33 +215,45 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [status]);
 
+  // Auto-scroll on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Focus input when switching to chat mode
+  useEffect(() => {
+    if (chatMode) inputRef.current?.focus();
+  }, [chatMode]);
 
   const sendMessage = useCallback(async (text) => {
     const trimmed = (text || '').trim();
     if (!trimmed || isLoading) return;
 
-    // Open the sidebar when a message is sent
-    setSidebarOpen(true);
+    // Switch to chat view on first message
+    if (!chatMode) setChatMode(true);
 
-    const userMsg = { id: Date.now(), sender: 'user', text: trimmed, feedback: null, source: null };
+    const userMsg = {
+      id: Date.now(), sender: 'user',
+      text: trimmed, feedback: null, source: null,
+    };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
+    // Offline fast path
     if (isOffline.current) {
       const { answer, matched } = searchFaq(trimmed);
       setMessages(prev => [...prev, {
         id: Date.now() + 1, sender: 'assistant',
         text: matched ? answer : '', feedback: null,
-        source: matched ? 'offline-cache' : 'offline-topics', userText: trimmed,
+        source: matched ? 'offline-cache' : 'offline-topics',
+        userText: trimmed,
       }]);
       setIsLoading(false);
       return;
     }
 
+    // Online path
     try {
       const ctrl = new AbortController();
       const tid  = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
@@ -230,16 +281,17 @@ export default function App() {
       setMessages(prev => [...prev, {
         id: Date.now() + 1, sender: 'assistant',
         text: matched ? answer : '', feedback: null,
-        source: matched ? 'offline-cache' : 'offline-topics', userText: trimmed,
+        source: matched ? 'offline-cache' : 'offline-topics',
+        userText: trimmed,
       }]);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, chatMode]);
 
   const handleSubmit      = e => { e.preventDefault(); sendMessage(input); };
-  const handleRetry       = useCallback(t => { if (t) sendMessage(t); },   [sendMessage]);
-  const handleTopicSelect = useCallback(l => sendMessage(l),                [sendMessage]);
+  const handleRetry       = useCallback(t => { if (t) sendMessage(t); }, [sendMessage]);
+  const handleTopicSelect = useCallback(l => sendMessage(l), [sendMessage]);
 
   const handleFeedback = useCallback(async (messageId, rating) => {
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, feedback: rating } : m));
@@ -256,123 +308,130 @@ export default function App() {
     } catch { /**/ }
   }, [messages]);
 
+  // ── New chat ──
+  const newChat = () => {
+    setMessages([]);
+    setChatMode(false);
+    setInput('');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
   return (
-    <div className="app-container">
+    <div className="app-shell">
 
-      {/* ── Floating button — root level, never trapped by overflow:hidden ── */}
-      <button
-        className={`floating-chat-bubble ${sidebarOpen ? 'hidden' : ''}`}
-        onClick={() => setSidebarOpen(true)}
-        aria-label="Open chat"
-        title="Open AssistFlow chat"
-      >
-        <img src="/bubble-logo.png" alt="Open chat" className="bubble-logo-img" />
-        <span className="bubble-pulse" />
-      </button>
-
-      {/* ── Backdrop ── */}
-      {sidebarOpen && (
-        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      )}
-
-      {/* ── Sidebar (slides in from right) ── */}
-      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-        <div className="sidebar-header">
-          <div>
-            <p className="eyebrow">AI Support</p>
-            <h2 className="sidebar-title">AssistFlow</h2>
-          </div>
-          <div className="header-actions">
-            <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>{status}</span>
-            <button className="sidebar-toggle" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
-          </div>
+      {/* ── Topbar ── */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <img src="/bubble-logo.png" alt="AssistFlow" className="topbar-logo-img" />
+          <span className="topbar-name">AssistFlow</span>
         </div>
-
-        <main className="sidebar-chat" role="list" aria-label="Conversation">
-          {messages.map(msg => (
-            <MessageBubble key={msg.id} message={msg}
-              onFeedback={handleFeedback} onRetry={handleRetry} onTopicSelect={handleTopicSelect} />
-          ))}
-          {isLoading && (
-            <div className="message-row assistant" role="status" aria-live="polite">
-              <div className="message-bubble loading-bubble">
-                <span className="dot" /><span className="dot" /><span className="dot" />
-              </div>
-            </div>
+        <div className="topbar-right">
+          {chatMode && (
+            <button className="topbar-btn new-chat-btn" onClick={newChat} title="New chat">
+              ✏️ New chat
+            </button>
           )}
-          <div ref={chatEndRef} />
-        </main>
-
-        <form className="sidebar-composer" onSubmit={handleSubmit} aria-label="Send a message">
-          <input ref={inputRef} type="text" value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Ask a question…"
-            aria-label="Message"
-            disabled={isLoading}
-          />
-          <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send">
-            {isLoading ? '…' : '↑'}
+          <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
+            {status}
+          </span>
+          <button className="topbar-icon-btn" onClick={() => setDarkMode(d => !d)} aria-label="Toggle dark mode">
+            {darkMode ? '☀️' : '🌙'}
           </button>
-        </form>
-      </aside>
+        </div>
+      </header>
 
-      {/* ── Main area ── */}
-      <div className="main-area">
-        <div className="main-content-wrapper">
+      {/* ── Main ── */}
+      <main className="chat-main">
 
-          {/* Top bar */}
-          <header className="topbar">
-            <span className="topbar-logo">AssistFlow</span>
-            <div className="topbar-actions">
-              <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>{status}</span>
-              <button className="topbar-btn" onClick={() => setDarkMode(d => !d)} aria-label="Toggle dark mode">
-                {darkMode ? '☀️' : '🌙'}
-              </button>
-            </div>
-          </header>
-
-          {/* Home screen */}
-          <section className="home-screen">
+        {/* HOME SCREEN */}
+        {!chatMode && (
+          <div className="home-screen">
             <div className="home-greeting">
               <h1 className="greeting-title">How can I help you?</h1>
-              <p className="greeting-sub">AI-powered support for your workplace questions and procedures.</p>
+              <p className="greeting-sub">
+                Ask about SOPs, troubleshooting, or any workplace procedure.
+              </p>
             </div>
 
-            {/* Big centred input — just like ChatGPT */}
-            <form className="home-composer" onSubmit={handleSubmit} aria-label="Ask a question">
-              <input
-                type="text"
-                className="home-input"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                placeholder="Ask me anything…"
-                aria-label="Question"
-                disabled={isLoading}
-                autoFocus
-              />
-              <button type="submit" className="home-send-btn"
-                disabled={isLoading || !input.trim()} aria-label="Send">
-                {isLoading ? '…' : '↑'}
-              </button>
+            <form className="composer-wrap" onSubmit={handleSubmit}>
+              <div className="composer-box">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className="composer-input"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  placeholder="Ask me anything…"
+                  aria-label="Question"
+                  disabled={isLoading}
+                  autoFocus
+                />
+                <button type="submit" className="composer-send"
+                  disabled={isLoading || !input.trim()} aria-label="Send">
+                  ↑
+                </button>
+              </div>
+              <p className="composer-hint">
+                39 offline protocols · Powered by Gemini 2.5 Flash
+              </p>
             </form>
 
             {/* Suggestion chips */}
             <div className="suggestions-grid">
               {SUGGESTIONS.map(s => (
-                <button key={s.query} className="suggestion-chip" onClick={() => sendMessage(s.query)}>
+                <button key={s.query} className="suggestion-chip"
+                  onClick={() => sendMessage(s.query)}>
                   <span className="chip-icon">{s.icon}</span>
                   <span className="chip-label">{s.label}</span>
                 </button>
               ))}
             </div>
+          </div>
+        )}
 
-            <p className="home-footer">
-              39 offline protocols · Powered by Gemini 2.5 Flash
+        {/* CHAT SCREEN */}
+        {chatMode && (
+          <div className="messages-area">
+            {messages.map(msg => (
+              <MessageRow key={msg.id} message={msg}
+                onFeedback={handleFeedback}
+                onRetry={handleRetry}
+                onTopicSelect={handleTopicSelect}
+              />
+            ))}
+            {isLoading && <TypingRow />}
+            <div ref={chatEndRef} />
+          </div>
+        )}
+      </main>
+
+      {/* ── Pinned composer (chat mode only) ── */}
+      {chatMode && (
+        <div className="composer-footer">
+          <form className="composer-wrap" onSubmit={handleSubmit}>
+            <div className="composer-box">
+              <input
+                ref={inputRef}
+                type="text"
+                className="composer-input"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="Ask a follow-up…"
+                aria-label="Message"
+                disabled={isLoading}
+              />
+              <button type="submit" className="composer-send"
+                disabled={isLoading || !input.trim()} aria-label="Send">
+                {isLoading ? '…' : '↑'}
+              </button>
+            </div>
+            <p className="composer-hint">
+              AssistFlow can make mistakes. Verify critical procedures.
             </p>
-          </section>
-
+          </form>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }
