@@ -275,4 +275,4 @@ For issues specific to the web app, check:
 - Network tab (F12 → Network) for failed requests
 - Backend logs for API errors
 
-See main `README.md` and `TESTING.md` for comprehensive documentation.
+See main [`README.md`](../README.md) and [`TESTING.md`](TESTING.md) for comprehensive documentation.

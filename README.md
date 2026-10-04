@@ -13,6 +13,18 @@ AssistFlow is a modern web application that gives call center agents real-time, 
 - 🌐 **Web Application** — Standalone React app accessible from any browser (recommended)
 - 🔌 **Chrome Extension** — Side-panel integration with CRM platforms (optional)
 
+## Documentation
+
+| Guide | Description |
+|---|---|
+| [Web application guide](docs/WEBAPP.md) | Run and deploy the standalone web app |
+| [Testing guide](docs/TESTING.md) | Backend, frontend, offline-mode, and extension testing |
+| [Deployment guide](docs/DEPLOYMENT_GUIDE.md) | End-to-end deployment checklist |
+| [Render setup guide](docs/RENDER_SETUP_GUIDE.md) | Deploy the backend to Render |
+| [Design guide](docs/DESIGN_GUIDE.md) | UI design specifications and implementation guidance |
+| [Extension summary](docs/EXTENSION_WIDGET_COMPLETE.md) | Chrome extension features and completion notes |
+| [Project context](docs/project_guidelines_and_context.md) | Thesis context and project guidelines |
+
 ---
 
 ## How It Works
@@ -73,6 +85,7 @@ ChromaDB   Gemini Flash
 - **Clickable topic list** — when no FAQ match is found offline, all topics shown as one-tap buttons
 - **Auto-recovery** — polls backend silently while offline and restores online mode automatically
 - **Thumbs up / down feedback** — per response, logged to backend for continuous improvement
+- **Per-user prompt history** — signed-in users can reload their saved prompts, responses, sources, and ratings
 - **Dark mode** — with system-preference detection and `localStorage` persistence
 - **Latency tracking** — every backend request logged with response time in ms
 - **Robust offline detection** — 5s timeout on first failure, then instant FAQ responses with zero network calls
@@ -98,11 +111,18 @@ ChromaDB   Gemini Flash
 ```text
 AssistFlow/
 ├── README.md
-├── TESTING.md                  ← comprehensive testing guide (backend, offline FAQ, UI)
-├── WEBAPP.md                   ← web application documentation and deployment guide
+├── docs/
+│   ├── WEBAPP.md               ← web application documentation and deployment guide
+│   ├── TESTING.md              ← backend, frontend, offline, and extension testing
+│   ├── DEPLOYMENT_GUIDE.md     ← end-to-end deployment checklist
+│   ├── RENDER_SETUP_GUIDE.md   ← Render backend setup
+│   ├── DESIGN_GUIDE.md         ← UI design specifications
+│   ├── EXTENSION_WIDGET_COMPLETE.md
+│   ├── GOOGLE_DRIVE_RAG_INTEGRATION.md
+│   ├── MODULE_STATUS_UPDATE.md
+│   ├── module_by_module_tech_stack_breakdown.md
+│   └── project_guidelines_and_context.md
 ├── .gitignore
-├── module_by_module_tech_stack_breakdown.md   ← development checklist
-├── project_guidelines_and_context.md          ← thesis context & rules
 │
 ├── backend/
 │   ├── .env                    ← local secrets (not committed)
@@ -215,7 +235,7 @@ The app opens automatically at **http://localhost:3000**
 - Works in any browser (Chrome, Firefox, Safari, Edge)
 - Perfect for managers, supervisors, and agents
 
-See **[WEBAPP.md](WEBAPP.md)** for deployment options and production configuration.
+See **[WEBAPP.md](docs/WEBAPP.md)** for deployment options and production configuration.
 
 ---
 
@@ -286,6 +306,11 @@ FASTAPI_HOST=0.0.0.0
 FASTAPI_PORT=8000
 LOG_LEVEL=INFO
 ```
+
+For login, profile details, and per-user prompt history, configure Supabase in
+`webapp/.env.local` using `webapp/.env.example`, then run `supabase/schema.sql`
+in the Supabase SQL Editor. Supabase Row Level Security ensures each user can
+only read and update their own profile and prompt history.
 
 ---
 
@@ -385,7 +410,7 @@ Then load `extension/sidepanel/dist/` in Chrome as an unpacked extension.
 - Highlight text for quick queries
 - Right-click for "Ask AssistFlow" menu
 
-See **[WEBAPP.md](WEBAPP.md)** for deployment and production configuration.
+See **[WEBAPP.md](docs/WEBAPP.md)** for deployment and production configuration.
 
 ---
 
@@ -521,7 +546,7 @@ The `source` field: `"rag"` (Gemini + ChromaDB), `"offline-cache"` (backend SQLi
 
 ## Testing
 
-Comprehensive testing procedures are documented in **[TESTING.md](TESTING.md)**, including:
+Comprehensive testing procedures are documented in **[TESTING.md](docs/TESTING.md)**, including:
 
 - **Backend API tests** — health checks, chat endpoints, feedback, offline status
 - **Sample prompts** — 40+ test queries organized by category (CRM, telephony, escalation, etc.)
@@ -538,7 +563,7 @@ source .venv/bin/activate
 pytest -v
 
 # Manual testing
-# Follow procedures in TESTING.md for UI and offline mode testing
+# Follow procedures in docs/TESTING.md for UI and offline mode testing
 ```
 
 ---

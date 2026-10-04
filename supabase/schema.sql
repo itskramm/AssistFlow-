@@ -60,3 +60,50 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Per-user prompt and response history.
+-- The user_id link keeps prompt history separate from profile details while
+-- allowing Supabase RLS to enforce ownership.
+create table if not exists public.prompt_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  prompt text not null,
+  response text not null default '',
+  source text not null default 'rag',
+  latency_ms numeric,
+  channel text not null default 'main'
+    check (channel in ('main', 'sidebar')),
+  rating smallint
+    check (rating in (1, 2)),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists prompt_history_user_created_idx
+  on public.prompt_history (user_id, created_at desc);
+
+alter table public.prompt_history enable row level security;
+
+drop policy if exists "Users can view their own prompt history"
+  on public.prompt_history;
+create policy "Users can view their own prompt history"
+  on public.prompt_history for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can create their own prompt history"
+  on public.prompt_history;
+create policy "Users can create their own prompt history"
+  on public.prompt_history for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update their own prompt history"
+  on public.prompt_history;
+create policy "Users can update their own prompt history"
+  on public.prompt_history for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can delete their own prompt history"
+  on public.prompt_history;
+create policy "Users can delete their own prompt history"
+  on public.prompt_history for delete
+  using (auth.uid() = user_id);

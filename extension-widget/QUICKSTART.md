@@ -117,4 +117,4 @@ You now have an AI assistant accessible from **every website** you visit!
 
 For detailed docs: see `README.md`  
 For troubleshooting: see `INSTALLATION.md`  
-For full summary: see `EXTENSION_WIDGET_COMPLETE.md`
+For full summary: see [`docs/EXTENSION_WIDGET_COMPLETE.md`](../docs/EXTENSION_WIDGET_COMPLETE.md)

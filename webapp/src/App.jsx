@@ -14,6 +14,7 @@ import { isSupabaseConfigured, supabase } from './supabaseClient.js';
 const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow-backend-ctbq.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
 const HEALTH_POLL_MS   = 30000;
+const PROMPT_HISTORY_LIMIT = 50;
 const OTP_LENGTH       = 6;
 
 const SUGGESTIONS = [
@@ -612,6 +613,100 @@ export default function App() {
     return () => { active = false; };
   }, [session]);
 
+  const promptHistoryRowsToMessages = useCallback((rows) => (
+    rows
+      .slice()
+      .reverse()
+      .flatMap(row => ([
+        {
+          id: `${row.id}:user`,
+          sender: 'user',
+          text: row.prompt,
+          feedback: null,
+          source: null,
+          historyId: row.id,
+        },
+        {
+          id: `${row.id}:assistant`,
+          sender: 'assistant',
+          text: row.response,
+          feedback: row.rating === 1 ? 'up' : row.rating === 2 ? 'down' : null,
+          source: row.source || 'rag',
+          latency_ms: row.latency_ms,
+          userText: row.prompt,
+          historyId: row.id,
+        },
+      ]))
+  ), []);
+
+  // Restore only this user's saved prompts after authentication.
+  useEffect(() => {
+    if (!supabase || !session?.user) {
+      setMessages([]);
+      setSideMessages([]);
+      setChatMode(false);
+      return undefined;
+    }
+
+    let active = true;
+    supabase
+      .from('prompt_history')
+      .select('id, prompt, response, source, latency_ms, channel, rating, created_at')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(PROMPT_HISTORY_LIMIT)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error('Unable to load prompt history:', error);
+          return;
+        }
+
+        const rows = data || [];
+        const mainRows = rows.filter(row => row.channel === 'main');
+        const sidebarRows = rows.filter(row => row.channel === 'sidebar');
+        setMessages(promptHistoryRowsToMessages(mainRows));
+        setSideMessages(promptHistoryRowsToMessages(sidebarRows));
+        setChatMode(mainRows.length > 0);
+      });
+
+    return () => { active = false; };
+  }, [promptHistoryRowsToMessages, session]);
+
+  const savePromptHistory = useCallback(async ({
+    prompt,
+    response,
+    source,
+    latencyMs,
+    channel = 'main',
+  }) => {
+    if (!supabase || !session?.user?.id) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('prompt_history')
+        .insert({
+          user_id: session.user.id,
+          prompt,
+          response,
+          source,
+          latency_ms: latencyMs ?? null,
+          channel,
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Unable to save prompt history:', error);
+        return null;
+      }
+      return data;
+    } catch (error) {
+      console.error('Unable to save prompt history:', error);
+      return null;
+    }
+  }, [session]);
+
   const handleLogout = useCallback(async () => {
     if (supabase) await supabase.auth.signOut();
     setMessages([]);
@@ -690,6 +785,20 @@ export default function App() {
         source: matched ? 'offline-cache' : 'offline-topics',
         userText: trimmed,
       }]);
+      const history = await savePromptHistory({
+        prompt: trimmed,
+        response: matched ? answer : '',
+        source: matched ? 'offline-cache' : 'offline-topics',
+      });
+      if (history) {
+        setMessages(prev => prev.map(message => (
+          message.sender === 'assistant' &&
+          message.userText === trimmed &&
+          !message.historyId
+            ? { ...message, historyId: history.id }
+            : message
+        )));
+      }
       setIsLoading(false);
       return;
     }
@@ -714,6 +823,21 @@ export default function App() {
         feedback: null, source: data.source || 'rag',
         latency_ms: data.latency_ms, userText: trimmed,
       }]);
+      const history = await savePromptHistory({
+        prompt: trimmed,
+        response: data.reply || 'The system responded but returned no guidance.',
+        source: data.source || 'rag',
+        latencyMs: data.latency_ms,
+      });
+      if (history) {
+        setMessages(prev => prev.map(message => (
+          message.sender === 'assistant' &&
+          message.userText === trimmed &&
+          !message.historyId
+            ? { ...message, historyId: history.id }
+            : message
+        )));
+      }
       setStatus(data.source === 'rag' ? 'Online' : 'Offline');
     } catch {
       isOffline.current = true;
@@ -725,10 +849,24 @@ export default function App() {
         source: matched ? 'offline-cache' : 'offline-topics',
         userText: trimmed,
       }]);
+      const history = await savePromptHistory({
+        prompt: trimmed,
+        response: matched ? answer : '',
+        source: matched ? 'offline-cache' : 'offline-topics',
+      });
+      if (history) {
+        setMessages(prev => prev.map(message => (
+          message.sender === 'assistant' &&
+          message.userText === trimmed &&
+          !message.historyId
+            ? { ...message, historyId: history.id }
+            : message
+        )));
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, chatMode]);
+  }, [chatMode, isLoading, savePromptHistory]);
 
   const handleSubmit      = e => { e.preventDefault(); sendMessage(input); };
   const handleRetry       = useCallback(t => { if (t) sendMessage(t); }, [sendMessage]);
@@ -751,6 +889,21 @@ export default function App() {
         text: matched ? answer : '', source: matched ? 'offline-cache' : 'offline-topics',
         userText: trimmed,
       }]);
+      const history = await savePromptHistory({
+        prompt: trimmed,
+        response: matched ? answer : '',
+        source: matched ? 'offline-cache' : 'offline-topics',
+        channel: 'sidebar',
+      });
+      if (history) {
+        setSideMessages(prev => prev.map(message => (
+          message.sender === 'assistant' &&
+          message.userText === trimmed &&
+          !message.historyId
+            ? { ...message, historyId: history.id }
+            : message
+        )));
+      }
       setSideLoading(false);
       return;
     }
@@ -772,6 +925,22 @@ export default function App() {
         text: data.reply || 'No guidance returned.',
         source: data.source || 'rag', userText: trimmed,
       }]);
+      const history = await savePromptHistory({
+        prompt: trimmed,
+        response: data.reply || 'No guidance returned.',
+        source: data.source || 'rag',
+        latencyMs: data.latency_ms,
+        channel: 'sidebar',
+      });
+      if (history) {
+        setSideMessages(prev => prev.map(message => (
+          message.sender === 'assistant' &&
+          message.userText === trimmed &&
+          !message.historyId
+            ? { ...message, historyId: history.id }
+            : message
+        )));
+      }
     } catch {
       const { answer, matched } = searchFaq(trimmed);
       setSideMessages(prev => [...prev, {
@@ -779,10 +948,25 @@ export default function App() {
         text: matched ? answer : '', source: matched ? 'offline-cache' : 'offline-topics',
         userText: trimmed,
       }]);
+      const history = await savePromptHistory({
+        prompt: trimmed,
+        response: matched ? answer : '',
+        source: matched ? 'offline-cache' : 'offline-topics',
+        channel: 'sidebar',
+      });
+      if (history) {
+        setSideMessages(prev => prev.map(message => (
+          message.sender === 'assistant' &&
+          message.userText === trimmed &&
+          !message.historyId
+            ? { ...message, historyId: history.id }
+            : message
+        )));
+      }
     } finally {
       setSideLoading(false);
     }
-  }, [sideLoading]);
+  }, [savePromptHistory, sideLoading]);
 
   const handleFeedback = useCallback(async (messageId, rating) => {
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, feedback: rating } : m));
@@ -791,13 +975,21 @@ export default function App() {
     const user = messages.slice(0, idx).reverse().find(m => m.sender === 'user');
     if (!msg) return;
     try {
+      if (supabase && msg.historyId) {
+        const { error } = await supabase
+          .from('prompt_history')
+          .update({ rating: rating === 'up' ? 1 : 2 })
+          .eq('id', msg.historyId)
+          .eq('user_id', session.user.id);
+        if (error) console.error('Unable to save prompt feedback:', error);
+      }
       await fetch(`${BACKEND_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ message: user?.text || '', reply: msg.text, rating: rating === 'up' ? 1 : 2 }),
       });
     } catch { /**/ }
-  }, [authHeaders, messages]);
+  }, [authHeaders, messages, session]);
 
   // ── New chat ──
   const newChat = () => {

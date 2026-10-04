@@ -19,7 +19,7 @@ You are refactoring the AssistFlow web application frontend to adopt a modern, G
 - **`webapp/src/offlineFaq.js`** — Offline FAQ logic (do not modify)
 
 ### Reference Files
-- **`DESIGN_GUIDE.md`** — Complete design specifications
+- **`docs/DESIGN_GUIDE.md`** — Complete design specifications
 - **`extension/sidepanel/src/App.jsx`** — Extension version (for reference)
 
 ## 🚫 What NOT to Touch
@@ -464,4 +464,4 @@ After implementation, the design should achieve:
 **Implementation Priority:** High  
 **Estimated Effort:** 4-6 hours  
 **Risk Level:** Medium (visual changes with functional preservation)  
-**Documentation:** DESIGN_GUIDE.md (complete specifications)
+**Documentation:** docs/DESIGN_GUIDE.md (complete specifications)

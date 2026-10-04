@@ -12,6 +12,7 @@ Standalone web version of the AssistFlow Chrome extension. This provides the sam
 - **Dark mode** support
 - **Supabase email/password login and sign-up** with email OTP verification
 - **Supabase profiles** with an account dropdown in the main page
+- **Per-user prompt history** — prompts, responses, source labels, and ratings are restored after sign-in
 - **Responsive design** — works on desktop and tablets
 
 ## Quick Start
@@ -61,8 +62,11 @@ You can also use the Supabase dashboard's Authentication → Users page to
 create accounts directly.
 
 Run `supabase/schema.sql` in the Supabase SQL Editor to create or update the
-protected `profiles` table and the trigger that creates a profile row for each
-new user. The profile dropdown shows the user's name, email, and role.
+protected `profiles` table, the per-user `prompt_history` table, and the trigger
+that creates a profile row for each new user. Prompt history is linked to the
+authenticated user's ID and protected by Row Level Security, so users cannot
+read or modify another user's prompts. The profile dropdown shows the user's
+name, email, and role.
 Only the Supabase URL and publishable/anonymous public key belong in Vite
 variables; never expose a Supabase service-role or secret key in the browser.
 
