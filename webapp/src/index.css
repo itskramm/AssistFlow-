@@ -142,14 +142,14 @@ html, body, #root {
   border-right: 1px solid var(--border-base);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease, width 0.3s ease;
+  transition: transform 0.3s ease;
   flex-shrink: 0;
   z-index: 10;
+  position: relative;
 }
 
 .sidebar.closed {
   transform: translateX(-100%);
-  width: 0;
 }
 
 .sidebar-header {
@@ -304,7 +304,9 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   max-width: 100%;
+  min-width: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .chat-header {
@@ -336,20 +338,38 @@ html, body, #root {
 /* Responsive design */
 @media (max-width: 768px) {
   .sidebar {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
     bottom: 0;
-    z-index: 100;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    height: 100vh;
+    z-index: 1000;
+    box-shadow: 2px 0 20px rgba(0,0,0,0.2);
   }
   
   .sidebar.closed {
     transform: translateX(-100%);
+    box-shadow: none;
+  }
+  
+  .main-area {
+    width: 100%;
   }
   
   .chat-title {
     font-size: 1rem;
+  }
+  
+  /* Add overlay when sidebar is open on mobile */
+  .sidebar.open::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 320px;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: -1;
   }
 }
 
@@ -397,10 +417,12 @@ html.dark .status-pill.offline { background: #450a0a; color: #fca5a5; }
   gap: 16px;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   max-width: 900px;
   margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
 }
 
 /* -------------------------------------------------------------------------
