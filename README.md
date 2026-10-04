@@ -1,221 +1,97 @@
-# AssistFlow — AI-Assisted Workplace Support System
+# AssistFlow
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
-[![Web App](https://img.shields.io/badge/web-application-blue.svg)](https://react.dev/)
+AI-assisted workplace support for call-center and customer-support teams.
+AssistFlow combines a FastAPI backend, a React web application, a Chrome CRM
+extension, a ChromaDB knowledge base, and a local FAQ fallback.
 
-> **Thesis Project:** *"Design and Development of an AI-Assisted Workplace Support System for Improving Workflow Efficiency and System Usability"*
+## Choose how to use AssistFlow
 
-AssistFlow is a modern web application that gives call center agents real-time, AI-powered guidance through an intuitive browser interface. It uses **Retrieval-Augmented Generation (RAG)** to ground every answer in your actual internal SOPs, and falls back to a bundled local FAQ instantly when the network or backend is unavailable — **no internet required, no extra setup**.
+| Option | Install | Best for |
+|---|---|---|
+| Deployed web app | Nothing beyond a browser | Everyday support questions and saved conversations |
+| Local web app | Python, Node.js, backend, and web app | Private or development environments |
+| Chrome extension | Chrome and the built extension | CRM ticket context and highlighted text |
 
-**Available in two deployment modes:**
-- 🌐 **Web Application** — Standalone React app accessible from any browser (recommended)
-- 🔌 **Chrome Extension** — Side-panel integration with CRM platforms (optional)
-
-## Documentation
-
-| Guide | Description |
-|---|---|
-| [Web application guide](docs/WEBAPP.md) | Run and deploy the standalone web app |
-| [Testing guide](docs/TESTING.md) | Backend, frontend, offline-mode, and extension testing |
-| [Deployment guide](docs/DEPLOYMENT_GUIDE.md) | End-to-end deployment checklist |
-| [Render setup guide](docs/RENDER_SETUP_GUIDE.md) | Deploy the backend to Render |
-| [Design guide](docs/DESIGN_GUIDE.md) | UI design specifications and implementation guidance |
-| [Chrome extension installation](extension/sidepanel/README.md) | Build, install, and use the CRM side panel |
-| [Project context](docs/project_guidelines_and_context.md) | Thesis context and project guidelines |
-
----
-
-## How It Works
-
-```
-User interacts with AssistFlow (Web App or Extension)
-         │
-         ▼
-  Is backend reachable?
-         │
-    YES  │                        NO (known offline)
-         ▼                              ▼
-   POST /api/chat              Local FAQ search
-         │                     (bundled in frontend,
-         ▼                      answers instantly,
-   FastAPI Backend             zero network calls)
-         │
-    ┌────┴────┐
-    ▼         ▼
-ChromaDB   Gemini Flash
-(Vector     (AI Generation)
- Search)
-    │         │
-    └────┬────┘
-         ▼
-  Step-by-step answer
-         │
-   (if Gemini unreachable
-    but backend is up)
-         ▼
-  Backend connectivity
-   probe + FAQ answer
-```
-
-### Online Flow
-1. User types a question or clicks a suggestion card
-2. FastAPI backend embeds the query using Google `gemini-embedding-001`
-3. ChromaDB retrieves the top-4 most relevant SOP chunks via cosine similarity
-4. Retrieved context + query sent to Gemini 2.5 Flash
-5. Gemini returns a grounded, step-by-step response
-
-### Offline Flow
-1. On first failed request, system marks itself offline (5s timeout)
-2. All subsequent queries answered **instantly** from local JS FAQ — no backend call, no network, no delay
-3. Background health poll (`GET /api/health`) runs every 30s
-4. Auto-switches back to online mode when backend recovers
-5. If query doesn't match FAQ, shows clickable list of all available topics
-
----
+The web application is the recommended starting point. The Chrome extension is
+optional and is intended for agents who work inside supported CRM platforms.
 
 ## Features
 
-### Core Features (Web App & Extension)
-- **Real-time AI assistance** — RAG pipeline with Gemini 2.5 Flash for accurate, contextual answers
-- **Numbered step rendering** — AI replies parsed and rendered as easy-to-follow step-by-step instructions
-- **Source badge** — each response shows where the answer came from: "AI · SOP" or "Offline cache"
-- **Instant offline FAQ** — 39 pre-loaded procedures with heavy keyword loading for robust matching
-- **Clickable topic list** — when no FAQ match is found offline, all topics shown as one-tap buttons
-- **Auto-recovery** — polls backend silently while offline and restores online mode automatically
-- **Thumbs up / down feedback** — per response, logged to backend for continuous improvement
-- **Per-user conversation history** — signed-in users can reopen saved chats with their prompts, responses, sources, and ratings
-- **Dark mode** — with system-preference detection and `localStorage` persistence
-- **Latency tracking** — every backend request logged with response time in ms
-- **Robust offline detection** — 5s timeout on first failure, then instant FAQ responses with zero network calls
+- Retrieval-Augmented Generation (RAG) grounded in internal SOPs and error logs
+- Gemini-powered troubleshooting and workplace support responses
+- Recent conversation context passed to the AI for follow-up questions
+- Optional CRM page context from the Chrome extension
+- Per-user profiles and conversation history in Supabase
+- Left-side conversation history in the web application
+- Thumbs-up and thumbs-down response feedback
+- Local FAQ fallback when the backend is unavailable
+- Automatic recovery when backend connectivity returns
+- Dark mode and responsive web layout
 
-### Web Application Exclusive
-- **Split-screen layout** — Interactive workspace with suggestion cards + chat panel
-- **Quick action cards** — Pre-configured prompts for common scenarios (CRM login, escalation, telephony, etc.)
-- **Modern Gemini-style UI** — Clean, sophisticated interface with glassmorphism effects
-- **Cross-browser support** — Works on Chrome, Firefox, Safari, and Edge
-- **No installation required** — Direct browser access at localhost or deployed URL
-- **Responsive design** — Optimized for desktop, tablet, and mobile devices
+## Documentation
 
-### Chrome Extension Exclusive
-- **Auto-activates** on 15+ CRM platforms (Salesforce, Zendesk, Freshdesk, Genesys, etc.)
-- **Live ticket context** — reads open ticket details from CRM DOM automatically
-- **Highlight-to-query** — select text on CRM page; one click sends it as query
-- **Right-click context menu** — "Ask AssistFlow" on any selected text
+| Guide | Purpose |
+|---|---|
+| [Web application guide](docs/WEBAPP.md) | Web app development and deployment |
+| [Chrome extension guide](extension/sidepanel/README.md) | Build, install, and use the CRM side panel |
+| [Testing guide](docs/TESTING.md) | Backend, frontend, offline, and extension checks |
+| [Deployment guide](docs/DEPLOYMENT_GUIDE.md) | End-to-end deployment checklist |
+| [Render setup guide](docs/RENDER_SETUP_GUIDE.md) | Deploy the backend to Render |
+| [Design guide](docs/DESIGN_GUIDE.md) | UI design specifications |
+| [Project context](docs/project_guidelines_and_context.md) | Thesis and project background |
 
----
-
-## Repository Structure
+## How the system works
 
 ```text
-AssistFlow/
-├── README.md
-├── docs/
-│   ├── WEBAPP.md               ← web application documentation and deployment guide
-│   ├── TESTING.md              ← backend, frontend, offline, and extension testing
-│   ├── DEPLOYMENT_GUIDE.md     ← end-to-end deployment checklist
-│   ├── RENDER_SETUP_GUIDE.md   ← Render backend setup
-│   ├── DESIGN_GUIDE.md         ← UI design specifications
-│   ├── EXTENSION_WIDGET_COMPLETE.md
-│   ├── GOOGLE_DRIVE_RAG_INTEGRATION.md
-│   ├── MODULE_STATUS_UPDATE.md
-│   ├── module_by_module_tech_stack_breakdown.md
-│   └── project_guidelines_and_context.md
-├── .gitignore
-│
-├── backend/
-│   ├── .env                    ← local secrets (not committed)
-│   ├── .env.example            ← template for all env vars
-│   ├── requirements.txt
-│   ├── run.py                  ← server startup script
-│   └── app/
-│       ├── main.py             ← FastAPI app + lifespan
-│       ├── api/
-│       │   ├── middleware.py   ← request/response logger
-│       │   └── routes/
-│       │       └── chat.py     ← /api/health, /api/chat, /api/offline-status, /api/feedback
-│       ├── core/
-│       │   ├── config.py       ← env var loading
-│       │   └── logging_config.py
-│       └── services/
-│           └── chat_service.py ← RAG pipeline + Gemini + connectivity probe
-│
-├── data/
-│   ├── knowledge/              ← SOP and error-log documents (.md / .txt) for ingestion
-│   │   ├── sop_crm_login_access.md
-│   │   ├── sop_call_quality_telephony.md
-│   │   ├── sop_system_downtime_offline.md
-│   │   ├── sop_ticket_escalation_routing.md
-│   │   ├── sop_customer_identity_verification.md
-│   │   ├── error_log_crm_systems.md
-│   │   ├── error_log_network_auth.md
-│   │   └── error_log_telephony.md
-│   ├── chroma/                 ← ChromaDB vector store (auto-created on ingestion)
-│   └── offline_cache/          ← SQLite DB (used by backend fallback only)
-│
-├── extension/
-│   └── sidepanel/
-│       ├── public/
-│       │   ├── manifest.json   ← Chrome Extension MV3 config
-│       │   └── background.js   ← service worker (auto-open, context menu)
-│       ├── src/
-│       │   ├── App.jsx         ← main side panel UI + offline detection logic
-│       │   ├── offlineFaq.js   ← 39-entry local FAQ + searchFaq() + getTopicList()
-│       │   ├── content.js      ← injected into CRM pages
-│       │   ├── index.css       ← Tailwind + custom styles
-│       │   └── main.jsx        ← React entry point
-│       ├── vite.config.js
-│       └── package.json
-│
-├── webapp/                     ← standalone web application (same functionality, no extension needed)
-│   ├── public/
-│   │   └── favicon.svg
-│   ├── src/
-│   │   ├── App.jsx            ← adapted from extension (no Chrome APIs)
-│   │   ├── main.jsx           ← entry point with layout wrapper
-│   │   ├── index.css          ← same styles + web-specific layout
-│   │   └── offlineFaq.js      ← same FAQ as extension
-│   ├── dist/                  ← production build output
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── package.json
-│
-└── scripts/
-    ├── ingest_knowledge.py     ← embed SOPs → ChromaDB
-    ├── seed_offline_db.py      ← populate backend SQLite cache (optional)
-    └── evaluate_rag.py         ← Ragas evaluation (in progress)
+Web app or Chrome extension
+          │
+          ▼
+      POST /api/chat
+          │
+          ▼
+   FastAPI ChatService
+       │          │
+       ▼          ▼
+   ChromaDB     Gemini
+  SOP retrieval  response
+       │          │
+       └────┬─────┘
+            ▼
+      Grounded guidance
+
+If the backend is unavailable:
+  frontend local FAQ → instant fallback response
 ```
 
----
+For an online request, the backend combines the current question with recent
+conversation turns, retrieves relevant knowledge from ChromaDB, and sends the
+retrieved context to Gemini. The extension can also provide ticket subject,
+description, status, priority, customer, and ticket ID as page context.
 
-## User Installation Guide
+When the backend cannot be reached, the web app and extension use their bundled
+FAQ data. The browser clients periodically check the backend and return to the
+online path when it recovers.
 
-Choose one of these ways to use AssistFlow:
+## User installation
 
-| Use case | What to install | Best for |
-|---|---|---|
-| Web application | Nothing beyond a browser when using the deployed app | General chat, account login, and saved conversation history |
-| Local web application | Python, Node.js, the backend, and the web app | Development or private local use |
-| Chrome extension | Chrome and the built extension | CRM ticket context, highlighted text, and the side panel |
+### Option 1: Use a deployed web app
 
-### Option 1: Use a deployed web application
+Open the web URL provided by your administrator, then sign in or create an
+account. No local installation or Chrome extension is required.
 
-Open the AssistFlow web URL provided by your administrator, sign in or create an
-account, and start chatting. No Chrome extension or local installation is required.
+The administrator must configure the deployed web app with a reachable backend
+and Supabase project. Never enter a Gemini API key into browser environment
+variables.
 
-The deployed web app must be configured with a reachable backend and Supabase
-project by the administrator. Do not put a Gemini API key in browser settings.
-
-### Option 2: Install and run the complete app locally
+### Option 2: Run the complete app locally
 
 #### Prerequisites
 
 - Python 3.11 or newer
 - Node.js 18 or newer and npm
-- Google Gemini API key
-- Google Chrome or another Chromium-based browser for the extension
-- A Supabase project if login and saved conversation history are required
+- A Google Gemini API key
+- A Supabase project for login and saved conversation history
+- Google Chrome 114 or newer if the extension is needed
 
 #### 1. Clone the repository
 
@@ -224,7 +100,7 @@ git clone https://github.com/itskramm/AssistFlow-.git
 cd AssistFlow-
 ```
 
-#### 2. Configure and install the backend
+#### 2. Install and configure the backend
 
 ```bash
 cd backend
@@ -236,218 +112,7 @@ pip install -r requirements.txt
 cd ..
 ```
 
-Edit `backend/.env` and set at least:
-
-```env
-GEMINI_API_KEY=your_google_gemini_api_key
-CHROMA_DB_PATH=../data/chroma
-OFFLINE_DB_PATH=../data/offline_cache/offline.db
-FASTAPI_HOST=0.0.0.0
-FASTAPI_PORT=8000
-```
-
-Build the local knowledge index once:
-
-```bash
-source backend/.venv/bin/activate
-python scripts/ingest_knowledge.py
-```
-
-Start the backend in a separate terminal:
-
-```bash
-cd backend
-source .venv/bin/activate
-python run.py
-```
-
-Confirm it is running:
-
-```bash
-curl http://127.0.0.1:8000/api/health
-```
-
-#### 3. Configure Supabase login and conversation history
-
-Create a Supabase project and enable **Email** under Authentication → Providers.
-Run `supabase/schema.sql` in the Supabase SQL Editor. This creates the protected
-profiles, conversation, and prompt-history tables.
-
-Configure the web app:
-
-```bash
-cp webapp/.env.example webapp/.env.local
-```
-
-Set these public browser variables in `webapp/.env.local`:
-
-```env
-VITE_BACKEND_URL=http://127.0.0.1:8000
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
-```
-
-Use the legacy `VITE_SUPABASE_ANON_KEY` only if the project provides an older
-Supabase anon key. Never expose a Supabase service-role key or Gemini key in the
-frontend.
-
-#### 4. Start the web application
-
-```bash
-cd webapp
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000`. Sign in, ask a question, and use the left history
-panel to reopen saved conversations.
-
-#### 5. Install the Chrome extension (optional)
-
-The extension is a separate build from the web app. Follow
-[the extension installation guide](extension/sidepanel/README.md), or run:
-
-```bash
-cd extension/sidepanel
-npm install
-npm run build
-```
-
-Then open `chrome://extensions`, enable **Developer mode**, click **Load
-unpacked**, and select the generated `extension/sidepanel/dist/` folder.
-
-The current extension connects to `http://127.0.0.1:8000`. Keep the local
-backend running while using it. For a deployed backend, change `BACKEND_URL` in
-`extension/sidepanel/src/App.jsx` before building again.
-
-### Starting the app after installation
-
-For normal local use, start the backend and web app in separate terminals:
-
-```bash
-# Terminal 1
-cd backend
-source .venv/bin/activate
-python run.py
-
-# Terminal 2
-cd webapp
-npm run dev
-```
-
-If using the extension, load it once in Chrome and click the AssistFlow toolbar
-button or open it from a supported CRM page.
-
----
-
-## Developer Reference: Running AssistFlow
-
-Once you've completed the one-time setup below, this is all you need each session:
-
-### Start the Backend
-
-From the `backend/` directory with the virtual environment active:
-
-```bash
-source .venv/bin/activate      # macOS / Linux
-# .venv\Scripts\activate       # Windows
-
-python run.py
-```
-
-Confirm it's up:
-
-```bash
-curl http://127.0.0.1:8000/api/health
-# → {"status": "ok", "service": "assistflow-backend"}
-```
-
-> **Dev tip:** Add `--reload` flag for hot-reloading during development:
-> ```bash
-> python run.py --reload
-> ```
-
----
-
-### Option A: Web Application (Recommended)
-
-Start the standalone web app — no installation or browser extension needed:
-
-```bash
-cd webapp
-npm run dev
-```
-
-The app opens automatically at **http://localhost:3000**
-
-**What you get:**
-- Modern Gemini-style interface with suggestion cards
-- Split-screen layout (workspace + chat panel)
-- Works in any browser (Chrome, Firefox, Safari, Edge)
-- Perfect for managers, supervisors, and agents
-
-See **[WEBAPP.md](docs/WEBAPP.md)** for deployment options and production configuration.
-
----
-
-### Option B: Chrome Extension (Optional)
-
-For CRM-integrated experience with automatic ticket context reading:
-
-1. Build the extension:
-   ```bash
-   cd extension/sidepanel
-   npm run build
-   ```
-
-2. Load in Chrome:
-   - Go to `chrome://extensions`
-   - Enable **Developer mode**
-   - Click **Load unpacked**
-   - Select `extension/sidepanel/dist/` folder
-
-3. Use: Navigate to any supported CRM — the side panel opens automatically
-
-**Extension benefits:**
-- Auto-opens on 15+ CRM platforms
-- Reads live ticket context from page
-- Highlight-to-query feature
-- Right-click context menu
-
----
-
-Both interfaces share the same backend and work identically offline. Choose based on your deployment needs.
-
----
-
-## Installation
-
-### Prerequisites
-
-- Python 3.11 or 3.13
-- Node.js 18+
-- Google Gemini API key
-- Google Chrome (or any Chromium-based browser)
-
----
-
-### Step 1 — Clone the repository
-
-```bash
-git clone https://github.com/itskramm/AssistFlow-.git
-cd AssistFlow-
-```
-
----
-
-### Step 2 — Configure the backend environment
-
-```bash
-cd backend
-cp .env.example .env
-```
-
-Open `.env` and fill in your values:
+Edit `backend/.env`:
 
 ```env
 GEMINI_API_KEY=your_google_gemini_api_key
@@ -458,67 +123,86 @@ FASTAPI_PORT=8000
 LOG_LEVEL=INFO
 ```
 
-For login, profile details, and per-user conversation history, configure Supabase in
-`webapp/.env.local` using `webapp/.env.example`, then run `supabase/schema.sql`
-in the Supabase SQL Editor. Supabase Row Level Security ensures each user can
-only read and update their own profile and conversation history.
+`GOOGLE_API_KEY` is also accepted by the knowledge-ingestion script, but
+`GEMINI_API_KEY` is the documented project variable.
 
----
+#### 3. Build the knowledge index
 
-### Step 3 — Install Python dependencies
-
-```bash
-# From the backend/ directory
-python -m venv .venv
-source .venv/bin/activate      # macOS / Linux
-# .venv\Scripts\activate       # Windows
-
-pip install -r requirements.txt
-```
-
----
-
-### Step 4 — Ingest the knowledge base
-
-Eight example documents (5 SOPs + 3 error logs) are already in `data/knowledge/`. Run:
+Run this once after configuring the API key, and again whenever knowledge files
+change:
 
 ```bash
-# From the project root
+source backend/.venv/bin/activate
 python scripts/ingest_knowledge.py
 ```
 
-This embeds all documents with `gemini-embedding-001` and stores them in ChromaDB at `data/chroma/`. Re-running is always safe — it clears and rebuilds the collection each time.
+The script reads `.md` and `.txt` files from `data/knowledge/` and stores the
+generated ChromaDB data under `data/chroma/`.
 
----
+#### 4. Start the backend
 
-### Step 5 — Start the backend server
+Use a terminal from the repository root:
 
 ```bash
-# From the backend/ directory
+cd backend
+source .venv/bin/activate
 python run.py
 ```
 
-The interactive API docs are available at `http://127.0.0.1:8000/docs`.
+Verify the server:
 
----
+```bash
+curl http://127.0.0.1:8000/api/health
+```
 
-### Step 6 — Build the Web Application
+OpenAPI documentation is available at
+`http://127.0.0.1:8000/docs`. Use `python run.py --reload` during development.
+
+#### 5. Configure Supabase
+
+Create a Supabase project and enable **Email** under
+**Authentication → Providers**. Run `supabase/schema.sql` in the Supabase SQL
+Editor. The schema creates:
+
+- `profiles` for user details
+- `prompt_conversations` for saved chats
+- `prompt_history` for prompt/response exchanges
+- Row Level Security policies so users access only their own records
+
+Configure the browser app:
+
+```bash
+cp webapp/.env.example webapp/.env.local
+```
+
+Set the public browser variables in `webapp/.env.local`:
+
+```env
+VITE_BACKEND_URL=http://127.0.0.1:8000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
+```
+
+For older Supabase projects, `VITE_SUPABASE_ANON_KEY` can be used instead of
+`VITE_SUPABASE_PUBLISHABLE_KEY`. Never expose a Supabase service-role key,
+database password, or Gemini API key in the frontend.
+
+#### 6. Start the web application
+
+In a second terminal:
 
 ```bash
 cd webapp
 npm install
-npm run build
+npm run dev
 ```
 
-This produces a `dist/` folder ready for deployment.
+Open `http://localhost:3000`, sign in, and send a message. Saved conversations
+appear in the left history panel and can be reopened after signing in again.
 
-For development, use `npm run dev` to start the dev server at http://localhost:3000.
+#### 7. Install the Chrome extension (optional)
 
----
-
-### Step 7 (Optional) — Build the Chrome Extension
-
-Only if you need CRM integration with automatic ticket context reading:
+The extension is built separately from the web app:
 
 ```bash
 cd extension/sidepanel
@@ -526,305 +210,169 @@ npm install
 npm run build
 ```
 
-Then load the extension:
-1. Go to `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select `extension/sidepanel/dist/` folder
+Then:
 
----
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked**.
+4. Select `extension/sidepanel/dist/`.
+5. Pin AssistFlow from Chrome's Extensions menu.
+6. Click the toolbar icon to open the side panel.
 
-### Step 8 — Launch AssistFlow
+The local extension uses `http://127.0.0.1:8000`. Keep the backend running
+while using it. To use another backend, update `BACKEND_URL` in
+`extension/sidepanel/src/App.jsx`, rebuild, and reload the extension.
 
-#### Web Application (Recommended)
+See the [Chrome extension guide](extension/sidepanel/README.md) for CRM
+support, page-context behavior, and troubleshooting.
+
+## Normal local startup
+
+After the one-time installation, use two terminals:
 
 ```bash
+# Terminal 1: backend
+cd backend
+source .venv/bin/activate
+python run.py
+```
+
+```bash
+# Terminal 2: web app
 cd webapp
 npm run dev
 ```
 
-- Opens at http://localhost:3000
-- Use the interactive suggestion cards or chat directly
-- Works in any modern browser
+If using the extension, load the built `extension/sidepanel/dist/` directory
+once in Chrome and reload it after each new build.
 
-#### Chrome Extension (Optional)
+## Offline behavior
 
-```bash
-cd extension/sidepanel
-npm run build
-```
-
-Then load `extension/sidepanel/dist/` in Chrome as an unpacked extension.
-
-- Auto-opens on CRM platforms
-- Manual open via toolbar icon on other pages
-- Highlight text for quick queries
-- Right-click for "Ask AssistFlow" menu
-
-See **[WEBAPP.md](docs/WEBAPP.md)** for deployment and production configuration.
-
----
-
-## Offline Mode
-
-The extension handles connectivity loss automatically — no configuration needed.
-
-| Situation | Behaviour |
+| Condition | Behavior |
 |---|---|
-| Backend reachable, internet available | Full RAG pipeline via Gemini |
-| Backend reachable, Gemini unreachable | Backend probes Gemini endpoint, serves answer from SQLite cache (39 protocols) |
-| Backend unreachable (first failure) | 5s timeout → marks offline → answers from local JS FAQ instantly |
-| Backend unreachable (subsequent queries) | Skips fetch entirely → local FAQ answer in < 1ms |
-| No FAQ match found | Shows a clickable list of all available topics |
-| Backend recovers | Auto-detected via 30s health poll → switches back to online mode |
+| Backend and Gemini available | RAG retrieval plus Gemini response |
+| Backend available but AI service unavailable | Backend fallback response |
+| Backend unreachable | Browser-local FAQ response |
+| Backend recovers | Health polling returns the client to online mode |
 
-### Offline Cache Coverage
+The bundled FAQ is maintained separately in:
 
-The system maintains **39 heavily keyword-loaded protocols** covering all 8 knowledge base documents:
+- `webapp/src/offlineFaq.js`
+- `extension/sidepanel/src/offlineFaq.js`
 
-**CRM & Login (5 protocols)**
-- Login failures with error codes (INVALID_SESSION_ID, SSO errors, authentication failures)
-- Account lockouts after failed attempts
-- Permission denied / access control issues
-- Session expiry and token problems
-- Record locking conflicts
+Update both files when changing offline answers, then rebuild the affected
+frontend.
 
-**Telephony & Audio (7 protocols)**
-- One-way audio (agent can't hear customer / customer can't hear agent)
-- Call quality issues (choppy, robotic, packet loss, jitter)
-- Call drops and disconnections
-- Echo and feedback issues
-- Softphone crashes and recovery
-- No incoming calls / routing failures
-- WebRTC and ICE connection failures
+## API reference
 
-**System Downtime (4 protocols)**
-- Complete CRM unavailability and offline workflows
-- Phone system downtime procedures
-- Business continuity plan activation
-- Post-downtime system restoration
-
-**Escalation & Routing (6 protocols)**
-- Tier 2 escalation procedures
-- Tier 3 / supervisor escalation for critical issues
-- Warm transfer step-by-step
-- Cold transfer procedures
-- SLA breach handling
-- Ticket status and priority management
-
-**Identity Verification (4 protocols)**
-- Standard 2-factor authentication
-- Third-party caller verification
-- OTP and enhanced verification procedures
-- Vulnerable customer handling
-
-**Network & Authentication (6 protocols)**
-- VPN connection failures
-- MFA and 2FA issues
-- SSL certificate errors
-- Active Directory authentication
-- Webhook and API errors
-- Network timeout troubleshooting
-
-**General Issues (7 protocols)**
-- HTTP error codes (403, 404, 500, 502, 503, 504)
-- Database connection failures
-- Browser compatibility and cache clearing
-- File upload errors
-- Session timeout handling
-- Password reset procedures
-- System performance degradation
-
-Each protocol is loaded with synonyms, platform names (Salesforce, Zendesk, Genesys, etc.), error codes, and natural agent phrasings to maximize matching accuracy.
-
-To add more FAQ entries, edit `extension/sidepanel/src/offlineFaq.js` and run `npm run build`.
-
----
-
-## Environment Variables Reference
-
-| Variable | Description | Default |
+| Method | Endpoint | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | Google Gemini API key | *(required)* |
-| `CHROMA_DB_PATH` | Path to ChromaDB storage directory | `../data/chroma` |
-| `OFFLINE_DB_PATH` | Path to SQLite offline cache (backend-side fallback) | `../data/offline_cache/offline.db` |
-| `FASTAPI_HOST` | Host address for the backend server | `0.0.0.0` |
-| `FASTAPI_PORT` | Port for the backend server | `8000` |
-| `LOG_LEVEL` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`) | `INFO` |
+| `GET` | `/api/health` | Backend liveness check |
+| `GET` | `/api/offline-status` | Check the backend SQLite cache |
+| `POST` | `/api/chat` | RAG chat with optional conversation and page context |
+| `POST` | `/api/offline-query` | Query the backend offline cache directly |
+| `POST` | `/api/feedback` | Receive thumbs-up/down feedback |
 
----
+Example chat request:
 
-## API Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Liveness check — also used by the extension's offline recovery probe |
-| `GET` | `/api/offline-status` | Reports backend connectivity status: `{"online": true/false}` based on Gemini API reachability |
-| `POST` | `/api/chat` | Submit a query — returns a RAG-grounded reply with latency and source metadata |
-| `POST` | `/api/feedback` | Submit a thumbs up/down rating on a response |
-
-**`POST /api/chat` request body:**
 ```json
 {
-  "message": "The agent cannot log into Salesforce",
+  "message": "I cannot log in because of a password error",
+  "conversation": [
+    {"role": "user", "content": "I use Zendesk"},
+    {"role": "assistant", "content": "Tell me what happens when you log in."}
+  ],
   "page_context": {
-    "ticketId": "12345",
+    "platform": "Zendesk",
     "subject": "Login failure",
     "status": "Open",
     "priority": "High",
-    "customer": "Jane Smith",
-    "description": "Agent reports SSO error on first login attempt"
+    "description": "The agent cannot sign in after a password error."
   }
 }
 ```
 
-The `page_context` field is optional. When present (populated automatically by the content script), Gemini uses the live ticket details to tailor its response.
+The response includes `reply`, `source`, and `latency_ms`. RAG responses also
+include retrieved source metadata when available.
 
-**`POST /api/chat` response:**
-```json
-{
-  "reply": "1. Ask the agent to confirm...",
-  "status": "ok",
-  "source": "rag",
-  "latency_ms": 1243.5,
-  "retrieved_sources": ["data/knowledge/sop_crm_login_access.md"]
-}
-```
+## Knowledge base maintenance
 
-The `source` field: `"rag"` (Gemini + ChromaDB), `"offline-cache"` (backend SQLite fallback), or `"fallback"` (no match).
-
----
-
-## Testing
-
-Comprehensive testing procedures are documented in **[TESTING.md](docs/TESTING.md)**, including:
-
-- **Backend API tests** — health checks, chat endpoints, feedback, offline status
-- **Sample prompts** — 40+ test queries organized by category (CRM, telephony, escalation, etc.)
-- **Offline FAQ tests** — match verification, no-match handling, auto-recovery procedures
-- **Extension UI checklist** — auto-open, context menu, dark mode, ticket context display
-- **Common issues & fixes** — troubleshooting guide for typical problems
-
-To run the full test suite:
+Add `.md` or `.txt` SOP and error-log files to `data/knowledge/`, then rebuild
+the vector index:
 
 ```bash
-# Backend API tests (requires backend running)
-cd backend
-source .venv/bin/activate
-pytest -v
-
-# Manual testing
-# Follow procedures in docs/TESTING.md for UI and offline mode testing
-```
-
----
-
-## Adding More SOPs
-
-Drop any `.md` or `.txt` file into `data/knowledge/` and re-run:
-
-```bash
+source backend/.venv/bin/activate
 python scripts/ingest_knowledge.py
 ```
 
-To extend the offline FAQ, add entries to `extension/sidepanel/src/offlineFaq.js` and rebuild:
+The current knowledge base covers CRM login, telephony, system downtime,
+escalation, identity verification, network authentication, and general system
+issues. The extension and web app FAQ files provide the local fallback for
+common versions of these issues.
+
+## Testing and validation
+
+Build both browser clients:
 
 ```bash
-cd extension/sidepanel && npm run build
+cd webapp && npm run build
+cd ../extension/sidepanel && npm run build
 ```
 
----
+Compile the backend modules:
 
-## Supported Platforms
+```bash
+backend/.venv/bin/python -m py_compile \
+  backend/app/services/chat_service.py \
+  backend/app/api/routes/chat.py
+```
 
-### Web Application
-- **Universal Access** — Works in any modern browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
-- **No Platform Restrictions** — Use alongside any CRM, dialer, or helpdesk system
-- **Deployment Options** — Localhost, internal server, Netlify, Vercel, Docker, or cloud hosting
+Check formatting and review the complete testing guide:
 
-### Chrome Extension (Optional CRM Auto-Activation)
+```bash
+git diff --check
+```
 
-| Platform | Domains |
-|---|---|
-| Salesforce | `salesforce.com`, `lightning.force.com` |
-| Zendesk | `zendesk.com` |
-| Freshdesk | `freshdesk.com`, `freshworks.com` |
-| Genesys Cloud | `genesyscloud.com`, `mypurecloud.com` |
-| Avaya | `avayacloud.com` |
-| RingCentral | `ringcentral.com` |
-| Talkdesk | `talkdesk.com` |
-| NICE inContact | `niceincontact.com` |
-| Five9 | `five9.com` |
-| HubSpot | `hubspot.com` |
-| ServiceNow | `servicenow.com` |
-| Intercom | `intercom.com` |
-| Help Scout | `helpscout.com` |
-| Kustomer | `kustomer.com` |
-| Zoho | `zohocrm.com`, `zoho.com` |
+See [docs/TESTING.md](docs/TESTING.md) for API checks, offline-mode checks,
+extension checks, and troubleshooting.
 
-*Note: Extension auto-opens on these domains and reads live ticket context.*
+## Repository structure
 
----
+```text
+AssistFlow-/
+├── backend/                  # FastAPI API, RAG service, and offline cache
+├── data/
+│   └── knowledge/            # SOP and error-log source documents
+├── extension/
+│   └── sidepanel/            # MV3 Chrome extension source and build
+├── webapp/                   # React/Vite standalone application
+├── scripts/
+│   └── ingest_knowledge.py   # Build the ChromaDB knowledge index
+├── supabase/
+│   └── schema.sql            # Profiles and conversation-history schema
+├── docs/                     # Deployment, testing, design, and project guides
+└── README.md
+```
 
-## Tech Stack
+## Supported CRM platforms
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | React 18, Tailwind CSS 3.4 |
-| **Build Tool** | Vite 5 + @vitejs/plugin-react |
-| **Deployment** | Web App (primary), Chrome Extension MV3 (optional) |
-| **Backend** | Python 3.11+, FastAPI 0.115, Uvicorn 0.30 |
-| **AI / LLM** | Google Gemini 2.5 Flash (via `langchain-google-genai`) |
-| **Embeddings** | Google `gemini-embedding-001` |
-| **Vector DB** | ChromaDB 0.5.11 (local, persistent, cosine similarity) |
-| **Orchestration** | LangChain 0.3.1 |
-| **Offline FAQ** | Plain JS object bundled in frontend (zero dependencies, 39 protocols) |
-| **Backend Cache** | SQLite (secondary fallback when backend is up but Gemini is down) |
-| **Evaluation** | Ragas 0.1.16, Pandas *(in progress)* |
+The extension has content-script support for domains associated with:
 
----
+Salesforce, Zendesk, Freshdesk, Freshworks, Genesys Cloud, PureCloud, Avaya
+Cloud, RingCentral, Talkdesk, NICE inContact, Five9, HubSpot, ServiceNow,
+Intercom, Help Scout, Kustomer, and Zoho.
 
-## Development Notes
+Automatic page-context extraction depends on the CRM's page structure. The
+side panel and manual text queries remain available when a page is not
+recognized.
 
-### Frontend Architecture
-- **Web App Primary** — Modern React application with Gemini-inspired UI, suggestion cards, and split-screen layout
-- **Extension Secondary** — Optional CRM integration mode with same core logic
-- **Shared Codebase** — Both use identical offline FAQ, state management, and API integration
-- **Responsive Design** — Works beautifully on desktop (1024px+), tablet (768-1024px), and mobile (<768px)
+## Deployment
 
-### Offline System
-- **Offline detection** — tracks connectivity in a `useRef` (no re-renders). First failure sets flag; all subsequent queries skip fetch entirely
-- **Fetch timeout** — 5s (down from 30s) for quick offline detection without blocking the agent
-- **Health poll** — background 30s interval auto-recovers when backend returns
-- **Network error detection** — comprehensive error string matching for DNS failures ("Name or service not known", "Temporary failure", "nodename nor servname")
-- **Keyword loading** — 39 offline protocols heavily keyword-loaded with synonyms, platform names, error codes, and natural phrasings
+For production deployment, use the detailed guides:
 
-### Backend Architecture
-- **Async safety** — all synchronous LangChain/ChromaDB calls offloaded via `asyncio.to_thread()`. FastAPI event loop never blocked
-- **Connectivity probe** — probes `generativelanguage.googleapis.com:443` (actual Gemini endpoint) before each request
-- **Retry logic** — Gemini calls retry up to 3 times with exponential backoff (1.5s base) for 429/5xx. Network errors skip retries
-- **Idempotent ingestion** — `ingest_knowledge.py` drops and rebuilds ChromaDB collection on every run. Safe to re-run
+- [Deployment guide](docs/DEPLOYMENT_GUIDE.md)
+- [Render setup guide](docs/RENDER_SETUP_GUIDE.md)
+- [Web application guide](docs/WEBAPP.md)
 
-### Security & Privacy
-- **Content script privacy** (extension only) — reads only visible text fields. Never touches passwords, hidden fields, or cross-origin iframes. Never modifies CRM DOM
-- **CORS** — set to `allow_origins=["*"]` for local development. Tighten to specific origins for production
-- **API key protection** — `GEMINI_API_KEY` in `.env` (never committed)
-- **Input validation** — Pydantic models with `min_length` constraints
-
-### Data Pipeline
-- **Feedback logging** — `POST /api/feedback` logs ratings to stdout. Ready for database integration
-- **Latency tracking** — every request logged with response time in milliseconds
-- **Source attribution** — all responses tagged with source ("rag", "offline-cache", "fallback")
-
----
-
-## Known Issues Fixed
-
-Recent bug fixes and improvements:
-
-1. **Connectivity probe** — Fixed to probe actual Gemini API endpoint (`generativelanguage.googleapis.com:443`) instead of generic DNS check
-2. **Socket timeout corruption** — Replaced `socket.setdefaulttimeout()` with per-request timeout to avoid global state corruption
-3. **Frontend status display** — Fixed to use `/api/offline-status` endpoint for accurate connectivity reporting
-4. **Network error detection** — Expanded error string matching to catch all DNS resolution failures
-5. **Offline cache expansion** — Increased from 13 to 39 protocols with comprehensive keyword loading
-6. **Auto-recovery** — Added 30s background health poll for automatic online mode restoration
+Keep Gemini and server credentials in the backend environment. Configure CORS,
+`VITE_BACKEND_URL`, and Supabase browser keys for the deployed frontend.
