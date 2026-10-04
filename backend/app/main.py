@@ -43,14 +43,8 @@ app.add_middleware(RequestLoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",           # Local web app development
-        "http://localhost:5173",           # Vite default dev server
-        "https://*.vercel.app",            # Vercel deployments
-        "https://*.netlify.app",           # Netlify deployments
-        "chrome-extension://*",            # Chrome extension
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins (safe for public API)
+    allow_credentials=False,  # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
