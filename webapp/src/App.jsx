@@ -628,6 +628,7 @@ export default function App() {
   const inputRef    = useRef(null);
   const sideInputRef = useRef(null);
   const isOffline   = useRef(false);
+  const chatRequestVersion = useRef(0);
 
   useEffect(() => {
     if (!supabase) {
@@ -700,12 +701,13 @@ export default function App() {
   ), []);
 
   const loadConversation = useCallback(async (conversationId, shouldScroll = false) => {
-    if (!supabase || !session?.user || !conversationId) return;
+    const userId = session?.user?.id;
+    if (!supabase || !userId || !conversationId) return;
 
     const { data, error } = await supabase
       .from('prompt_history')
       .select('id, prompt, response, source, latency_ms, channel, rating, created_at')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .eq('conversation_id', conversationId)
       .eq('channel', 'main')
       .order('created_at', { ascending: true });
@@ -723,11 +725,12 @@ export default function App() {
     if (shouldScroll) {
       requestAnimationFrame(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }));
     }
-  }, [promptHistoryRowsToMessages, session]);
+  }, [promptHistoryRowsToMessages, session?.user?.id]);
 
   // Restore this user's conversation list and most recent conversation.
   useEffect(() => {
-    if (!supabase || !session?.user) {
+    const userId = session?.user?.id;
+    if (!supabase || !userId) {
       setMessages([]);
       setSideMessages([]);
       setChatMode(false);
@@ -741,7 +744,7 @@ export default function App() {
     supabase
       .from('prompt_conversations')
       .select('id, title, channel, created_at, updated_at')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .eq('channel', 'main')
       .order('updated_at', { ascending: false })
       .limit(PROMPT_HISTORY_LIMIT)
@@ -764,7 +767,7 @@ export default function App() {
       });
 
     return () => { active = false; };
-  }, [loadConversation, session]);
+  }, [loadConversation, session?.user?.id]);
 
   const savePromptHistory = useCallback(async ({
     prompt,
@@ -903,7 +906,9 @@ export default function App() {
     const trimmed = (text || '').trim();
     if (!trimmed || isLoading) return;
 
+    const requestVersion = chatRequestVersion.current;
     const conversationId = await ensureConversation(trimmed);
+    if (requestVersion !== chatRequestVersion.current) return;
 
     // Switch to chat view on first message
     if (!chatMode) setChatMode(true);
@@ -919,6 +924,7 @@ export default function App() {
     // Offline fast path
     if (isOffline.current) {
       const { answer, matched } = searchFaq(trimmed);
+      if (requestVersion !== chatRequestVersion.current) return;
       setMessages(prev => [...prev, {
         id: Date.now() + 1, sender: 'assistant',
         text: matched ? answer : '', feedback: null,
@@ -957,6 +963,7 @@ export default function App() {
       clearTimeout(tid);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (requestVersion !== chatRequestVersion.current) return;
       isOffline.current = false;
       setMessages(prev => [...prev, {
         id: Date.now() + 1, sender: 'assistant',
@@ -985,6 +992,7 @@ export default function App() {
       isOffline.current = true;
       setStatus('Offline');
       const { answer, matched } = searchFaq(trimmed);
+      if (requestVersion !== chatRequestVersion.current) return;
       setMessages(prev => [...prev, {
         id: Date.now() + 1, sender: 'assistant',
         text: matched ? answer : '', feedback: null,
@@ -1136,10 +1144,12 @@ export default function App() {
 
   // ── New chat ──
   const newChat = () => {
+    chatRequestVersion.current += 1;
     setMessages([]);
     setChatMode(false);
     setActiveConversationId(null);
     setSelectedHistoryId(null);
+    setIsLoading(false);
     setInput('');
     setTimeout(() => inputRef.current?.focus(), 50);
   };
