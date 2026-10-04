@@ -22,7 +22,7 @@ AssistFlow is a modern web application that gives call center agents real-time, 
 | [Deployment guide](docs/DEPLOYMENT_GUIDE.md) | End-to-end deployment checklist |
 | [Render setup guide](docs/RENDER_SETUP_GUIDE.md) | Deploy the backend to Render |
 | [Design guide](docs/DESIGN_GUIDE.md) | UI design specifications and implementation guidance |
-| [Extension summary](docs/EXTENSION_WIDGET_COMPLETE.md) | Chrome extension features and completion notes |
+| [Chrome extension installation](extension/sidepanel/README.md) | Build, install, and use the CRM side panel |
 | [Project context](docs/project_guidelines_and_context.md) | Thesis context and project guidelines |
 
 ---
@@ -189,7 +189,158 @@ AssistFlow/
 
 ---
 
-## Running AssistFlow
+## User Installation Guide
+
+Choose one of these ways to use AssistFlow:
+
+| Use case | What to install | Best for |
+|---|---|---|
+| Web application | Nothing beyond a browser when using the deployed app | General chat, account login, and saved conversation history |
+| Local web application | Python, Node.js, the backend, and the web app | Development or private local use |
+| Chrome extension | Chrome and the built extension | CRM ticket context, highlighted text, and the side panel |
+
+### Option 1: Use a deployed web application
+
+Open the AssistFlow web URL provided by your administrator, sign in or create an
+account, and start chatting. No Chrome extension or local installation is required.
+
+The deployed web app must be configured with a reachable backend and Supabase
+project by the administrator. Do not put a Gemini API key in browser settings.
+
+### Option 2: Install and run the complete app locally
+
+#### Prerequisites
+
+- Python 3.11 or newer
+- Node.js 18 or newer and npm
+- Google Gemini API key
+- Google Chrome or another Chromium-based browser for the extension
+- A Supabase project if login and saved conversation history are required
+
+#### 1. Clone the repository
+
+```bash
+git clone https://github.com/itskramm/AssistFlow-.git
+cd AssistFlow-
+```
+
+#### 2. Configure and install the backend
+
+```bash
+cd backend
+cp .env.example .env
+python -m venv .venv
+source .venv/bin/activate       # macOS/Linux
+# .venv\Scripts\activate        # Windows PowerShell
+pip install -r requirements.txt
+cd ..
+```
+
+Edit `backend/.env` and set at least:
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key
+CHROMA_DB_PATH=../data/chroma
+OFFLINE_DB_PATH=../data/offline_cache/offline.db
+FASTAPI_HOST=0.0.0.0
+FASTAPI_PORT=8000
+```
+
+Build the local knowledge index once:
+
+```bash
+source backend/.venv/bin/activate
+python scripts/ingest_knowledge.py
+```
+
+Start the backend in a separate terminal:
+
+```bash
+cd backend
+source .venv/bin/activate
+python run.py
+```
+
+Confirm it is running:
+
+```bash
+curl http://127.0.0.1:8000/api/health
+```
+
+#### 3. Configure Supabase login and conversation history
+
+Create a Supabase project and enable **Email** under Authentication → Providers.
+Run `supabase/schema.sql` in the Supabase SQL Editor. This creates the protected
+profiles, conversation, and prompt-history tables.
+
+Configure the web app:
+
+```bash
+cp webapp/.env.example webapp/.env.local
+```
+
+Set these public browser variables in `webapp/.env.local`:
+
+```env
+VITE_BACKEND_URL=http://127.0.0.1:8000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
+```
+
+Use the legacy `VITE_SUPABASE_ANON_KEY` only if the project provides an older
+Supabase anon key. Never expose a Supabase service-role key or Gemini key in the
+frontend.
+
+#### 4. Start the web application
+
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. Sign in, ask a question, and use the left history
+panel to reopen saved conversations.
+
+#### 5. Install the Chrome extension (optional)
+
+The extension is a separate build from the web app. Follow
+[the extension installation guide](extension/sidepanel/README.md), or run:
+
+```bash
+cd extension/sidepanel
+npm install
+npm run build
+```
+
+Then open `chrome://extensions`, enable **Developer mode**, click **Load
+unpacked**, and select the generated `extension/sidepanel/dist/` folder.
+
+The current extension connects to `http://127.0.0.1:8000`. Keep the local
+backend running while using it. For a deployed backend, change `BACKEND_URL` in
+`extension/sidepanel/src/App.jsx` before building again.
+
+### Starting the app after installation
+
+For normal local use, start the backend and web app in separate terminals:
+
+```bash
+# Terminal 1
+cd backend
+source .venv/bin/activate
+python run.py
+
+# Terminal 2
+cd webapp
+npm run dev
+```
+
+If using the extension, load it once in Chrome and click the AssistFlow toolbar
+button or open it from a supported CRM page.
+
+---
+
+## Developer Reference: Running AssistFlow
 
 Once you've completed the one-time setup below, this is all you need each session:
 
@@ -284,7 +435,7 @@ Both interfaces share the same backend and work identically offline. Choose base
 
 ```bash
 git clone https://github.com/itskramm/AssistFlow-.git
-cd AssistFlow
+cd AssistFlow-
 ```
 
 ---
