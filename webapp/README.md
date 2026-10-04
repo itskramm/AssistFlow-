@@ -48,7 +48,7 @@ Then copy `webapp/.env.example` to `.env.local` and set:
 
 ```bash
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
 ```
 
 The app displays the login/sign-up page until a valid Supabase session exists.
@@ -62,8 +62,8 @@ create accounts directly.
 Run `supabase/schema.sql` in the Supabase SQL Editor to create or update the
 protected `profiles` table and the trigger that creates a profile row for each
 new user. The profile dropdown shows the user's name, email, and role.
-Only the Supabase URL and anonymous public key belong in Vite variables; never
-expose a Supabase service-role key in the browser.
+Only the Supabase URL and publishable/anonymous public key belong in Vite
+variables; never expose a Supabase service-role or secret key in the browser.
 
 ## Build for Production
 
