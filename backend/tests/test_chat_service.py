@@ -9,6 +9,24 @@ def test_scope_signal_rejects_unrelated_question():
     assert chat_service_module._has_scope_signal("The customer cannot hear me on the call")
 
 
+def test_response_mode_allows_general_questions_but_protects_company_requests():
+    assert chat_service_module._response_mode(
+        "What is the capital of France?",
+        [],
+        [],
+    ) == "general"
+    assert chat_service_module._response_mode(
+        "What is our company's password policy?",
+        [],
+        [],
+    ) == "scope"
+    assert chat_service_module._response_mode(
+        "How do I reset my CRM password?",
+        ["CRM password reset procedure"],
+        [],
+    ) == "grounded"
+
+
 def test_knowledge_gate_rejects_new_topic_from_supported_conversation():
     context = ["CRM password reset procedure"]
     conversation = [{"role": "user", "content": "I cannot log into the CRM"}]

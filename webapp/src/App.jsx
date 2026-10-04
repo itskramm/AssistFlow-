@@ -98,6 +98,7 @@ const SOURCE_LABELS = {
   'offline-cache': { label: 'Offline cache',    cls: 'source-offline' },
   'fallback':      { label: 'No connection',    cls: 'source-fallback'},
   'scope':         { label: 'Supported topics', cls: 'source-rag'     },
+  'general':       { label: 'General guidance', cls: 'source-rag'     },
   'help':          { label: 'Assistant',     cls: 'source-rag'     },
 };
 
@@ -1026,7 +1027,7 @@ export default function App() {
             : message
         )));
       }
-      setStatus(data.source === 'rag' || data.source === 'scope' || data.source === 'help'
+      setStatus(data.source === 'rag' || data.source === 'scope' || data.source === 'general' || data.source === 'help'
         ? 'Online'
         : 'Offline');
     } catch {

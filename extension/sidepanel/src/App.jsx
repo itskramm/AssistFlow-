@@ -126,6 +126,7 @@ const SOURCE_LABELS = {
   'offline-cache': { label: 'Offline cache',    cls: 'source-offline' },
   'fallback':      { label: 'No connection',    cls: 'source-fallback'},
   'scope':         { label: 'Supported topics', cls: 'source-rag'   },
+  'general':       { label: 'General guidance', cls: 'source-rag'   },
 };
 
 function SourceBadge({ source }) {
@@ -394,7 +395,7 @@ export default function App() {
         latency_ms: data.latency_ms,
         userText:   trimmed,
       }]);
-      setStatus(data.source === 'rag' || data.source === 'scope'
+      setStatus(data.source === 'rag' || data.source === 'scope' || data.source === 'general'
         ? 'Online'
         : 'Offline');
     } catch {
