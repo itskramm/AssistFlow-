@@ -8,19 +8,20 @@ services:
     region: oregon  # Choose: oregon, frankfurt, ohio, singapore
     plan: free
     branch: main
-    buildCommand: pip install -r backend/requirements.txt && python scripts/ingest_knowledge.py
-    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python scripts/ingest_knowledge.py
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.0"
       - key: CHROMA_PERSIST_DIR
-        value: /opt/render/project/src/data/chroma
+        value: data/chroma
       - key: CHROMA_DB_PATH
-        value: /opt/render/project/src/data/chroma
+        value: data/chroma
       - key: KNOWLEDGE_DIR
-        value: /opt/render/project/src/data/knowledge
+        value: data/knowledge
       - key: OFFLINE_DB_PATH
-        value: /opt/render/project/src/data/offline_cache/offline.db
+        value: data/offline_cache/offline.db
       - key: PORT
         value: "10000"
       - key: GOOGLE_API_KEY

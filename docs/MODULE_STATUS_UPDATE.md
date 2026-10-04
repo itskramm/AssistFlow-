@@ -305,9 +305,9 @@ python-dotenv==1.0.1
 ```bash
 # .env file (required)
 GOOGLE_API_KEY=your_gemini_api_key_here
-CHROMA_PERSIST_DIR=../data/chroma
-KNOWLEDGE_DIR=../data/knowledge
-OFFLINE_DB_PATH=../data/offline_cache/offline.db
+CHROMA_PERSIST_DIR=data/chroma
+KNOWLEDGE_DIR=data/knowledge
+OFFLINE_DB_PATH=data/offline_cache/offline.db
 ```
 
 **Status:** 🟢 Fully operational on PID 11868
@@ -320,7 +320,7 @@ OFFLINE_DB_PATH=../data/offline_cache/offline.db
 
 **Vector Database:**
 - ✅ ChromaDB 0.5.11 persistent storage
-- ✅ Location: `/Users/mark/AssistFlow/data/chroma/`
+- ✅ Location: `/Users/mark/AssistFlow/backend/data/chroma/`
 - ✅ Collections created and indexed
 - ✅ Embedding model: `models/embedding-001` (Gemini)
 
@@ -358,6 +358,7 @@ Average Retrieval Time: 50-150ms
 
 **Ingestion Script:**
 ```bash
+cd backend
 cd scripts
 python ingest_knowledge.py
 # Output: "✓ Successfully ingested 8 documents"

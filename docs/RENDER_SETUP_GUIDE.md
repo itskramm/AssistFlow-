@@ -79,10 +79,10 @@ Fill in the configuration:
 | **Name** | `assistflow-backend` |
 | **Region** | Oregon (US West) — *Choose closest to your users* |
 | **Branch** | `main` |
-| **Root Directory** | Leave blank (repository root) |
+| **Root Directory** | `backend` |
 | **Runtime** | Python 3 |
-| **Build Command** | `pip install -r backend/requirements.txt && python scripts/ingest_knowledge.py` |
-| **Start Command** | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Build Command** | `pip install -r requirements.txt && python scripts/ingest_knowledge.py` |
+| **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | **Instance Type** | Free |
 
 **Advanced Settings:**
@@ -105,9 +105,9 @@ Click **"Create Web Service"**
 | Key | Value | Notes |
 |-----|-------|-------|
 | `GOOGLE_API_KEY` | `AIza...your_key` | **Required** — Get from [Google AI Studio](https://makersuite.google.com/app/apikey) |
-| `CHROMA_PERSIST_DIR` | `/opt/render/project/src/data/chroma` | ChromaDB storage path |
-| `KNOWLEDGE_DIR` | `/opt/render/project/src/data/knowledge` | Knowledge base location |
-| `OFFLINE_DB_PATH` | `/opt/render/project/src/data/offline_cache/offline.db` | Offline cache database |
+| `CHROMA_PERSIST_DIR` | `data/chroma` | ChromaDB storage path |
+| `KNOWLEDGE_DIR` | `data/knowledge` | Knowledge base location |
+| `OFFLINE_DB_PATH` | `data/offline_cache/offline.db` | Offline cache database |
 | `PYTHON_VERSION` | `3.11.0` | Python runtime version |
 
 4. Click **"Save Changes"**
@@ -410,12 +410,12 @@ google.api_core.exceptions.InvalidArgument: API key not valid
 
 **Check logs for:**
 ```
-Could not connect to a Chroma server at /opt/render/project/src/data/chroma
+ChromaDB collection 'assistflow_knowledge' not found at /opt/render/project/src/backend/data/chroma
 ```
 
 **Fix:**
 - Verify `CHROMA_PERSIST_DIR` environment variable
-- Correct path: `/opt/render/project/src/data/chroma`
+- Correct path: `data/chroma` (resolved inside the backend root directory)
 - Redeploy after fixing
 
 ---

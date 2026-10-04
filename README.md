@@ -116,8 +116,8 @@ Edit `backend/.env`:
 
 ```env
 GEMINI_API_KEY=your_google_gemini_api_key
-CHROMA_DB_PATH=../data/chroma
-OFFLINE_DB_PATH=../data/offline_cache/offline.db
+CHROMA_DB_PATH=data/chroma
+OFFLINE_DB_PATH=data/offline_cache/offline.db
 FASTAPI_HOST=0.0.0.0
 FASTAPI_PORT=8000
 LOG_LEVEL=INFO
@@ -136,8 +136,8 @@ source backend/.venv/bin/activate
 python scripts/ingest_knowledge.py
 ```
 
-The script reads `.md` and `.txt` files from `data/knowledge/` and stores the
-generated ChromaDB data under `data/chroma/`.
+The script reads `.md` and `.txt` files from `backend/data/knowledge/` and stores
+the generated ChromaDB data under `backend/data/chroma/`.
 
 #### 4. Start the backend
 
@@ -297,7 +297,7 @@ include retrieved source metadata when available.
 
 ## Knowledge base maintenance
 
-Add `.md` or `.txt` SOP and error-log files to `data/knowledge/`, then rebuild
+Add `.md` or `.txt` SOP and error-log files to `backend/data/knowledge/`, then rebuild
 the vector index:
 
 ```bash
