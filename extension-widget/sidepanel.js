@@ -1,4 +1,4 @@
-// AssistFlow Side Panel Logic
+// SmartOpsSupportHub Side Panel Logic
 
 const BACKEND_URL = 'https://assistflow-backend-ctbq.onrender.com';
 

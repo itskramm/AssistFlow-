@@ -1,5 +1,5 @@
 /**
- * App.jsx — AssistFlow Web Application
+ * App.jsx — SmartOpsSupportHub Web Application
  *
  * ChatGPT-style layout:
  *   - Home: centred greeting + input bar + suggestion chips
@@ -113,11 +113,9 @@ function MessageRow({ message, onFeedback, onRetry, onTopicSelect }) {
     <div className="msg-row msg-assistant">
       {/* Avatar */}
       <div className="msg-avatar">
-        <img src="/bubble-logo.png" alt="AssistFlow" />
+        <img src="/bubble-logo.png" alt="SmartOpsSupportHub" />
       </div>
 
-      <div className="msg-body">
-        <div className={`msg-bubble-assistant ${isError ? 'msg-error' : ''}`}>
           {isTopics
             ? <TopicList onSelect={onTopicSelect} />
             : steps
@@ -181,7 +179,7 @@ function TypingRow() {
   return (
     <div className="msg-row msg-assistant">
       <div className="msg-avatar">
-        <img src="/bubble-logo.png" alt="AssistFlow" />
+        <img src="/bubble-logo.png" alt="SmartOpsSupportHub" />
       </div>
       <div className="msg-body">
         <div className="msg-bubble-assistant loading-bubble">
@@ -207,7 +205,7 @@ export default function App() {
   const [chatMode,   setChatMode]   = useState(false);
   const [darkMode,   setDarkMode]   = useState(() => {
     try {
-      const s = localStorage.getItem('assistflow-dark');
+      const s = localStorage.getItem('smartops-dark');
       if (s !== null) return s === 'true';
     } catch { /**/ }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -221,7 +219,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
-    try { localStorage.setItem('assistflow-dark', String(darkMode)); } catch { /**/ }
+    try { localStorage.setItem('smartops-dark', String(darkMode)); } catch { /**/ }
   }, [darkMode]);
 
   // Health poll when offline
@@ -408,7 +406,7 @@ export default function App() {
         className={`floating-bubble ${sidebarOpen ? 'bubble-hidden' : ''}`}
         onClick={() => setSidebarOpen(true)}
         aria-label="Open assistant"
-        title="Open AssistFlow assistant"
+        title="Open SmartOpsSupportHub assistant"
       >
         <img src="/bubble-logo.png" alt="" className="bubble-img" />
       </button>
@@ -422,9 +420,9 @@ export default function App() {
       <aside className={`sidebar-panel ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
         <div className="sidebar-header">
           <div className="sidebar-header-left">
-            <img src="/bubble-logo.png" alt="AssistFlow" className="sidebar-avatar" />
+            <img src="/bubble-logo.png" alt="SmartOpsSupportHub" className="sidebar-avatar" />
             <div>
-              <p className="sidebar-title">AssistFlow</p>
+              <p className="sidebar-title">SmartOpsSupportHub</p>
               <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>{status}</span>
             </div>
           </div>
@@ -471,8 +469,8 @@ export default function App() {
       {/* ── Topbar ── */}
       <header className="topbar">
         <div className="topbar-left">
-          <img src="/bubble-logo.png" alt="AssistFlow" className="topbar-logo-img" />
-          <span className="topbar-name">AssistFlow</span>
+          <img src="/bubble-logo.png" alt="SmartOpsSupportHub" className="topbar-logo-img" />
+          <span className="topbar-name">SmartOpsSupportHub</span>
         </div>
         <div className="topbar-right">
           {chatMode && (
@@ -575,7 +573,7 @@ export default function App() {
               </button>
             </div>
             <p className="composer-hint">
-              AssistFlow can make mistakes. Verify critical procedures.
+              SmartOpsSupportHub can make mistakes. Verify critical procedures.
             </p>
           </form>
         </div>

@@ -1,4 +1,4 @@
-// AssistFlow Background Service Worker
+// SmartOpsSupportHub Background Service Worker
 // Handles side panel opening
 
 chrome.action.onClicked.addListener((tab) => {
