@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { searchFaq, getTopicList } from './offlineFaq.js';
 
-const BACKEND_URL      = 'http://127.0.0.1:8000';
+const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow-backend-ctbq.onrender.com';
 const FETCH_TIMEOUT_MS = 5000;
 const HEALTH_POLL_MS   = 30000;
 
