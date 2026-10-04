@@ -1,19 +1,18 @@
 /**
  * App.jsx — AssistFlow Web Application
  *
- * Standalone web version of the Chrome extension side panel.
- * Same offline detection logic and process flow as the extension.
+ * ChatGPT/Gemini-style layout:
+ *   - Home screen: centred greeting + big input bar + suggestion chips
+ *   - On first send: sidebar slides in with the full conversation
+ *   - Floating 💬 button always visible at bottom-right (rendered at root)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { searchFaq, getTopicList } from './offlineFaq.js';
 
 const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow-backend-ctbq.onrender.com';
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 15000;
 const HEALTH_POLL_MS   = 30000;
-
-// Debug: Log the backend URL being used
-console.log('🔗 AssistFlow Backend URL:', BACKEND_URL);
 
 const WELCOME_MESSAGE = {
   id: 'welcome',
@@ -23,65 +22,60 @@ const WELCOME_MESSAGE = {
   source: null,
 };
 
-// ---------------------------------------------------------------------------
-// Markdown-lite renderer
-// ---------------------------------------------------------------------------
+const SUGGESTIONS = [
+  { icon: '🔑', label: 'CRM password reset',     query: 'How do I reset my CRM password?' },
+  { icon: '📞', label: 'Call quality issues',     query: 'Call quality issues on my headset' },
+  { icon: '📋', label: 'Escalate a ticket',       query: 'How do I escalate a ticket?' },
+  { icon: '🆔', label: 'Identity verification',   query: 'Customer identity verification steps' },
+  { icon: '🌐', label: 'VPN not connecting',      query: 'VPN disconnected, how do I reconnect?' },
+  { icon: '⚡', label: 'System running slow',     query: 'My system is running slow' },
+];
 
-function stripBold(text) {
-  return text.replace(/\*\*(.*?)\*\*/g, '$1');
-}
-
+// ---------------------------------------------------------------------------
+// Inline markdown (bold only)
+// ---------------------------------------------------------------------------
 function parseInline(text) {
   const parts = [];
-  const regex = /\*\*(.*?)\*\*/g;
-  let last = 0;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > last) parts.push({ bold: false, text: text.slice(last, match.index) });
-    parts.push({ bold: true, text: match[1] });
-    last = match.index + match[0].length;
+  const re = /\*\*(.*?)\*\*/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ bold: false, text: text.slice(last, m.index) });
+    parts.push({ bold: true, text: m[1] });
+    last = m.index + m[0].length;
   }
   if (last < text.length) parts.push({ bold: false, text: text.slice(last) });
   return parts.length ? parts : [{ bold: false, text }];
 }
 
 function InlineText({ text }) {
-  const parts = parseInline(text);
   return (
     <>
-      {parts.map((p, i) =>
+      {parseInline(text).map((p, i) =>
         p.bold ? <strong key={i}>{p.text}</strong> : <span key={i}>{p.text}</span>
       )}
     </>
   );
 }
 
+function stripBold(t) { return t.replace(/\*\*(.*?)\*\*/g, '$1'); }
+
 function parseSteps(text) {
   const lines = text.split('\n').map(l => stripBold(l.trim())).filter(Boolean);
-  const stepPattern = /^(\d+[.):]\s+|step\s+\d+[.:]\s*)/i;
-  const steps = lines.filter(l => stepPattern.test(l));
-  if (steps.length >= 2) {
-    return steps.map(l => l.replace(stepPattern, '').trim());
-  }
-  return null;
+  const re = /^(\d+[.):]\s+|step\s+\d+[.:]\s*)/i;
+  const steps = lines.filter(l => re.test(l));
+  return steps.length >= 2 ? steps.map(l => l.replace(re, '').trim()) : null;
 }
 
 // ---------------------------------------------------------------------------
 // Offline topic list
 // ---------------------------------------------------------------------------
-
 function TopicList({ onSelect }) {
-  const topics = getTopicList();
   return (
     <div className="topic-list">
       <p className="topic-list-heading">I can help with these topics while offline:</p>
       <ul>
-        {topics.map((label, i) => (
-          <li key={i}>
-            <button className="topic-btn" onClick={() => onSelect(label)}>
-              {label}
-            </button>
-          </li>
+        {getTopicList().map((label, i) => (
+          <li key={i}><button className="topic-btn" onClick={() => onSelect(label)}>{label}</button></li>
         ))}
       </ul>
     </div>
@@ -91,33 +85,21 @@ function TopicList({ onSelect }) {
 // ---------------------------------------------------------------------------
 // Source badge
 // ---------------------------------------------------------------------------
-
 const SOURCE_LABELS = {
-  'rag':           { label: 'AI · SOP',        cls: 'source-rag'     },
-  'offline-cache': { label: 'Offline cache',    cls: 'source-offline' },
-  'fallback':      { label: 'No connection',    cls: 'source-fallback'},
+  'rag':           { label: 'AI · SOP',      cls: 'source-rag'     },
+  'offline-cache': { label: 'Offline cache', cls: 'source-offline' },
+  'fallback':      { label: 'No connection', cls: 'source-fallback' },
 };
 
 function SourceBadge({ source }) {
-  if (!source || source === null) return null;
+  if (!source) return null;
   const { label, cls } = SOURCE_LABELS[source] || { label: source, cls: 'source-rag' };
   return <span className={`source-badge ${cls}`}>{label}</span>;
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components
+// Message bubble
 // ---------------------------------------------------------------------------
-
-function StepList({ steps }) {
-  return (
-    <ol className="steps-list" aria-label="Step-by-step instructions">
-      {steps.map((step, i) => (
-        <li key={i}><InlineText text={step} /></li>
-      ))}
-    </ol>
-  );
-}
-
 function MessageBubble({ message, onFeedback, onRetry, onTopicSelect }) {
   const isAssistant = message.sender === 'assistant';
   const isError     = message.source === 'fallback';
@@ -130,36 +112,21 @@ function MessageBubble({ message, onFeedback, onRetry, onTopicSelect }) {
         {isTopics
           ? <TopicList onSelect={onTopicSelect} />
           : steps
-            ? <StepList steps={steps} />
+            ? <ol className="steps-list">{steps.map((s, i) => <li key={i}><InlineText text={s} /></li>)}</ol>
             : <p className="bubble-text"><InlineText text={message.text} /></p>
         }
-
         {isAssistant && message.id !== 'welcome' && !isTopics && (
           <div className="bubble-footer">
             <SourceBadge source={message.source} />
-
             {isError && onRetry && (
-              <button className="retry-btn" onClick={() => onRetry(message.userText)}>
-                ↺ Retry
-              </button>
+              <button className="retry-btn" onClick={() => onRetry(message.userText)}>↺ Retry</button>
             )}
-
             {!isError && (
-              <div className="feedback-row" aria-label="Rate this response">
-                <button
-                  className={`feedback-btn ${message.feedback === 'up' ? 'active-up' : ''}`}
-                  onClick={() => onFeedback(message.id, 'up')}
-                  aria-label="Helpful"
-                  title="Helpful"
-                  disabled={message.feedback !== null}
-                >👍</button>
-                <button
-                  className={`feedback-btn ${message.feedback === 'down' ? 'active-down' : ''}`}
-                  onClick={() => onFeedback(message.id, 'down')}
-                  aria-label="Not helpful"
-                  title="Not helpful"
-                  disabled={message.feedback !== null}
-                >👎</button>
+              <div className="feedback-row">
+                <button className={`feedback-btn ${message.feedback === 'up'   ? 'active-up'   : ''}`}
+                  onClick={() => onFeedback(message.id, 'up')}   disabled={message.feedback !== null} aria-label="Helpful">👍</button>
+                <button className={`feedback-btn ${message.feedback === 'down' ? 'active-down' : ''}`}
+                  onClick={() => onFeedback(message.id, 'down')} disabled={message.feedback !== null} aria-label="Not helpful">👎</button>
               </div>
             )}
           </div>
@@ -172,18 +139,17 @@ function MessageBubble({ message, onFeedback, onRetry, onTopicSelect }) {
 // ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
-
 export default function App() {
-  const [messages,  setMessages]  = useState([WELCOME_MESSAGE]);
-  const [input,     setInput]     = useState('');
-  const [status,    setStatus]    = useState('Online');
-  const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed
-  const [darkMode,  setDarkMode]  = useState(() => {
+  const [messages,    setMessages]    = useState([WELCOME_MESSAGE]);
+  const [input,       setInput]       = useState('');
+  const [status,      setStatus]      = useState('Online');
+  const [isLoading,   setIsLoading]   = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode,    setDarkMode]    = useState(() => {
     try {
-      const stored = localStorage.getItem('assistflow-dark');
-      if (stored !== null) return stored === 'true';
-    } catch { /* ignore */ }
+      const s = localStorage.getItem('assistflow-dark');
+      if (s !== null) return s === 'true';
+    } catch { /**/ }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
@@ -191,199 +157,142 @@ export default function App() {
   const inputRef   = useRef(null);
   const isOffline  = useRef(false);
 
-  // Apply dark mode class
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
-    try { localStorage.setItem('assistflow-dark', String(darkMode)); } catch { /* ignore */ }
+    try { localStorage.setItem('assistflow-dark', String(darkMode)); } catch { /**/ }
   }, [darkMode]);
 
-  // Health poll — while offline, probe /api/health every 30s
   useEffect(() => {
     let timer = null;
-
     const probe = async () => {
       if (!isOffline.current) return;
       try {
         const res = await fetch(`${BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          isOffline.current = false;
-          setStatus('Online');
-        }
-      } catch {
-        // Still offline
-      } finally {
-        if (isOffline.current) {
-          timer = setTimeout(probe, HEALTH_POLL_MS);
-        }
-      }
+        if (res.ok) { isOffline.current = false; setStatus('Online'); }
+      } catch { /**/ }
+      finally { if (isOffline.current) timer = setTimeout(probe, HEALTH_POLL_MS); }
     };
-
-    if (status === 'Offline') {
-      timer = setTimeout(probe, HEALTH_POLL_MS);
-    }
-
+    if (status === 'Offline') timer = setTimeout(probe, HEALTH_POLL_MS);
     return () => clearTimeout(timer);
   }, [status]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Send message with offline detection
   const sendMessage = useCallback(async (text) => {
     const trimmed = (text || '').trim();
     if (!trimmed || isLoading) return;
 
+    // Open the sidebar when a message is sent
+    setSidebarOpen(true);
+
     const userMsg = { id: Date.now(), sender: 'user', text: trimmed, feedback: null, source: null };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
-    // Fast path: already know we're offline
     if (isOffline.current) {
       const { answer, matched } = searchFaq(trimmed);
-      setMessages((prev) => [...prev, {
-        id:       Date.now() + 1,
-        sender:   'assistant',
-        text:     matched ? answer : '',
-        feedback: null,
-        source:   matched ? 'offline-cache' : 'offline-topics',
-        userText: trimmed,
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1, sender: 'assistant',
+        text: matched ? answer : '', feedback: null,
+        source: matched ? 'offline-cache' : 'offline-topics', userText: trimmed,
       }]);
       setIsLoading(false);
       return;
     }
 
-    // Normal path: try the backend
     try {
-      const controller = new AbortController();
-      const timeoutId  = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-      const res = await fetch(`${BACKEND_URL}/api/chat`, {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      const res  = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: trimmed }),
-        signal: controller.signal,
+        signal: ctrl.signal,
       });
-      clearTimeout(timeoutId);
-
+      clearTimeout(tid);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-
       isOffline.current = false;
-      setMessages((prev) => [...prev, {
-        id:         Date.now() + 1,
-        sender:     'assistant',
-        text:       data.reply || 'The system responded but returned no guidance.',
-        feedback:   null,
-        source:     data.source || 'rag',
-        latency_ms: data.latency_ms,
-        userText:   trimmed,
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1, sender: 'assistant',
+        text: data.reply || 'The system responded but returned no guidance.',
+        feedback: null, source: data.source || 'rag',
+        latency_ms: data.latency_ms, userText: trimmed,
       }]);
       setStatus(data.source === 'rag' ? 'Online' : 'Offline');
     } catch {
-      // Fetch failed — mark offline, serve FAQ
       isOffline.current = true;
       setStatus('Offline');
-
       const { answer, matched } = searchFaq(trimmed);
-      setMessages((prev) => [...prev, {
-        id:       Date.now() + 1,
-        sender:   'assistant',
-        text:     matched ? answer : '',
-        feedback: null,
-        source:   matched ? 'offline-cache' : 'offline-topics',
-        userText: trimmed,
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1, sender: 'assistant',
+        text: matched ? answer : '', feedback: null,
+        source: matched ? 'offline-cache' : 'offline-topics', userText: trimmed,
       }]);
     } finally {
       setIsLoading(false);
     }
   }, [isLoading]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    sendMessage(input);
-  };
-
-  const handleRetry = useCallback((originalText) => {
-    if (originalText) sendMessage(originalText);
-  }, [sendMessage]);
-
-  const handleTopicSelect = useCallback((label) => {
-    sendMessage(label);
-  }, [sendMessage]);
+  const handleSubmit      = e => { e.preventDefault(); sendMessage(input); };
+  const handleRetry       = useCallback(t => { if (t) sendMessage(t); },   [sendMessage]);
+  const handleTopicSelect = useCallback(l => sendMessage(l),                [sendMessage]);
 
   const handleFeedback = useCallback(async (messageId, rating) => {
-    setMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? { ...m, feedback: rating } : m))
-    );
-
-    const msg      = messages.find((m) => m.id === messageId);
-    const msgIndex = messages.findIndex((m) => m.id === messageId);
-    const userMsg  = messages.slice(0, msgIndex).reverse().find((m) => m.sender === 'user');
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, feedback: rating } : m));
+    const msg  = messages.find(m => m.id === messageId);
+    const idx  = messages.findIndex(m => m.id === messageId);
+    const user = messages.slice(0, idx).reverse().find(m => m.sender === 'user');
     if (!msg) return;
-
     try {
       await fetch(`${BACKEND_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMsg?.text || '',
-          reply:   msg.text,
-          rating:  rating === 'up' ? 1 : 2,
-        }),
+        body: JSON.stringify({ message: user?.text || '', reply: msg.text, rating: rating === 'up' ? 1 : 2 }),
       });
-    } catch {
-      // Best-effort
-    }
+    } catch { /**/ }
   }, [messages]);
 
   return (
     <div className="app-container">
-      {/* Backdrop overlay when sidebar is open */}
+
+      {/* ── Floating button — root level, never trapped by overflow:hidden ── */}
+      <button
+        className={`floating-chat-bubble ${sidebarOpen ? 'hidden' : ''}`}
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open chat"
+        title="Open AssistFlow chat"
+      >
+        <span className="bubble-icon">💬</span>
+        <span className="bubble-pulse" />
+      </button>
+
+      {/* ── Backdrop ── */}
       {sidebarOpen && (
-        <div 
-          className="sidebar-backdrop" 
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
       )}
 
-      {/* Sidebar with chat */}
+      {/* ── Sidebar (slides in from right) ── */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <div>
-            <p className="eyebrow">AI Support System</p>
+            <p className="eyebrow">AI Support</p>
             <h2 className="sidebar-title">AssistFlow</h2>
           </div>
           <div className="header-actions">
-            <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
-              {status}
-            </span>
-            <button
-              className="sidebar-toggle"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
-              title="Close sidebar"
-            >
-              ✕
-            </button>
+            <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>{status}</span>
+            <button className="sidebar-toggle" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
           </div>
         </div>
 
-        {/* Chat in sidebar */}
         <main className="sidebar-chat" role="list" aria-label="Conversation">
-          {messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              onFeedback={handleFeedback}
-              onRetry={handleRetry}
-              onTopicSelect={handleTopicSelect}
-            />
+          {messages.map(msg => (
+            <MessageBubble key={msg.id} message={msg}
+              onFeedback={handleFeedback} onRetry={handleRetry} onTopicSelect={handleTopicSelect} />
           ))}
-
           {isLoading && (
             <div className="message-row assistant" role="status" aria-live="polite">
               <div className="message-bubble loading-bubble">
@@ -391,19 +300,14 @@ export default function App() {
               </div>
             </div>
           )}
-
           <div ref={chatEndRef} />
         </main>
 
-        {/* Input in sidebar */}
-        <form className="sidebar-composer" onSubmit={handleSubmit} role="form" aria-label="Send a message">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question..."
-            aria-label="Issue description or question"
+        <form className="sidebar-composer" onSubmit={handleSubmit} aria-label="Send a message">
+          <input ref={inputRef} type="text" value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="Ask a question…"
+            aria-label="Message"
             disabled={isLoading}
           />
           <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send">
@@ -412,86 +316,61 @@ export default function App() {
         </form>
       </aside>
 
-      {/* Main content area */}
+      {/* ── Main area ── */}
       <div className="main-area">
-        {/* Floating chat button - always visible */}
-        <button
-          className={`floating-chat-bubble ${sidebarOpen ? 'hidden' : ''}`}
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open chat"
-          title="Chat with AssistFlow AI"
-        >
-          <span className="bubble-icon">💬</span>
-          <span className="bubble-pulse"></span>
-        </button>
-
         <div className="main-content-wrapper">
-          <div className="welcome-section">
-            <h1 className="main-title">AssistFlow</h1>
-            <p className="main-subtitle">AI-Powered Workplace Support</p>
-            
-            <div className="features-grid">
-              <div className="feature-card">
-                <div className="feature-icon">🤖</div>
-                <h3>AI Assistant</h3>
-                <p>Get instant answers powered by Gemini AI</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">📚</div>
-                <h3>Knowledge Base</h3>
-                <p>Access SOPs and troubleshooting guides</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">⚡</div>
-                <h3>Offline Mode</h3>
-                <p>39 protocols available without connection</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🎯</div>
-                <h3>Quick Solutions</h3>
-                <p>Step-by-step procedures and fixes</p>
-              </div>
-            </div>
 
-            <div className="quick-start">
-              <h3>Quick Topics</h3>
-              <div className="topic-grid">
-                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("How do I reset my CRM password?"); }}>
-                  🔑 CRM Password Reset
-                </button>
-                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("System is running slow"); }}>
-                  ⚡ System Slowness
-                </button>
-                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("Call quality issues"); }}>
-                  📞 Call Quality
-                </button>
-                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("VPN disconnected"); }}>
-                  🌐 VPN Issues
-                </button>
-                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("How do I escalate a ticket?"); }}>
-                  📋 Ticket Escalation
-                </button>
-                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("Customer identity verification"); }}>
-                  🆔 Identity Verification
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <button
-                className="setting-button"
-                onClick={() => setDarkMode(d => !d)}
-              >
-                {darkMode ? '☀️' : '🌙'} {darkMode ? 'Light Mode' : 'Dark Mode'}
-              </button>
-              <button
-                className="setting-button"
-                onClick={() => setMessages([WELCOME_MESSAGE])}
-              >
-                🗑️ Clear Chat
+          {/* Top bar */}
+          <header className="topbar">
+            <span className="topbar-logo">AssistFlow</span>
+            <div className="topbar-actions">
+              <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>{status}</span>
+              <button className="topbar-btn" onClick={() => setDarkMode(d => !d)} aria-label="Toggle dark mode">
+                {darkMode ? '☀️' : '🌙'}
               </button>
             </div>
-          </div>
+          </header>
+
+          {/* Home screen */}
+          <section className="home-screen">
+            <div className="home-greeting">
+              <h1 className="greeting-title">How can I help you?</h1>
+              <p className="greeting-sub">AI-powered support for your workplace questions and procedures.</p>
+            </div>
+
+            {/* Big centred input — just like ChatGPT */}
+            <form className="home-composer" onSubmit={handleSubmit} aria-label="Ask a question">
+              <input
+                type="text"
+                className="home-input"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="Ask me anything…"
+                aria-label="Question"
+                disabled={isLoading}
+                autoFocus
+              />
+              <button type="submit" className="home-send-btn"
+                disabled={isLoading || !input.trim()} aria-label="Send">
+                {isLoading ? '…' : '↑'}
+              </button>
+            </form>
+
+            {/* Suggestion chips */}
+            <div className="suggestions-grid">
+              {SUGGESTIONS.map(s => (
+                <button key={s.query} className="suggestion-chip" onClick={() => sendMessage(s.query)}>
+                  <span className="chip-icon">{s.icon}</span>
+                  <span className="chip-label">{s.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="home-footer">
+              39 offline protocols · Powered by Gemini 2.5 Flash
+            </p>
+          </section>
+
         </div>
       </div>
     </div>
