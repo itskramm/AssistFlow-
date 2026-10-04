@@ -26,6 +26,19 @@ const SUGGESTIONS = [
   { icon: '⚡', label: 'System running slow',   query: 'My system is running slow' },
 ];
 
+function getConversationTurns(messages) {
+  return messages
+    .filter(message => (
+      (message.sender === 'user' || message.sender === 'assistant') &&
+      message.text?.trim()
+    ))
+    .slice(-12)
+    .map(message => ({
+      role: message.sender,
+      content: message.text.slice(0, 1200),
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Inline markdown (bold only)
 // ---------------------------------------------------------------------------
@@ -674,8 +687,6 @@ export default function App() {
 
   const promptHistoryRowsToMessages = useCallback((rows) => (
     rows
-      .slice()
-      .reverse()
       .flatMap(row => ([
         {
           id: `${row.id}:user`,
@@ -906,6 +917,7 @@ export default function App() {
     const trimmed = (text || '').trim();
     if (!trimmed || isLoading) return;
 
+    const conversation = getConversationTurns(messages);
     const requestVersion = chatRequestVersion.current;
     const conversationId = await ensureConversation(trimmed);
     if (requestVersion !== chatRequestVersion.current) return;
@@ -957,7 +969,7 @@ export default function App() {
       const res  = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, conversation }),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
@@ -1017,7 +1029,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [chatMode, ensureConversation, isLoading, savePromptHistory]);
+  }, [chatMode, ensureConversation, isLoading, messages, savePromptHistory]);
 
   const handleSubmit      = e => { e.preventDefault(); sendMessage(input); };
   const handleRetry       = useCallback(t => { if (t) sendMessage(t); }, [sendMessage]);
@@ -1028,6 +1040,7 @@ export default function App() {
     const trimmed = (text || '').trim();
     if (!trimmed || sideLoading) return;
 
+    const conversation = getConversationTurns(sideMessages);
     const userMsg = { id: Date.now(), sender: 'user', text: trimmed, source: null };
     setSideMessages(prev => [...prev, userMsg]);
     setSideInput('');
@@ -1065,7 +1078,7 @@ export default function App() {
       const res  = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, conversation }),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
@@ -1117,7 +1130,7 @@ export default function App() {
     } finally {
       setSideLoading(false);
     }
-  }, [savePromptHistory, sideLoading]);
+  }, [savePromptHistory, sideLoading, sideMessages]);
 
   const handleFeedback = useCallback(async (messageId, rating) => {
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, feedback: rating } : m));

@@ -145,6 +145,8 @@ Response policy:
   or guaranteed outcomes.
 - You may answer common workplace and technical questions, explain concepts, help troubleshoot,
   draft messages, and ask clarifying questions. You do not need an exact keyword match.
+- Treat the recent conversation as active context. If the agent already identified a platform
+  or symptom in an earlier turn, do not ask for it again.
 - For clearly unrelated requests, briefly explain that your strongest support is workplace and
   customer-service assistance, then redirect toward a supported use case. Do not use a rigid
   refusal for a reasonable support question.
@@ -160,7 +162,9 @@ When to ask a clarifying question:
     * "System is down" → ask which specific system and whether it affects all agents or just one
     * "Can't transfer the call" → ask whether it's a warm or cold transfer and what error appears
 - Only ask ONE question — never ask multiple questions at once.
-- If the agent's query already contains enough detail (specific platform, error code, symptom), skip the clarifying question and go straight to the resolution steps.
+- If the current query or recent conversation contains enough detail (specific platform, error
+  code, symptom, or a clear issue such as a password error), skip clarification and go straight
+  to the resolution steps.
 - If the current page context (ticket details) already answers the clarifying question, use that information directly without asking.
 
 When giving resolution steps:
@@ -203,7 +207,12 @@ class ChatService:
     # Public async interface
     # ------------------------------------------------------------------
 
-    async def process_message(self, message: str, page_context: dict | None = None) -> dict:
+    async def process_message(
+        self,
+        message: str,
+        page_context: dict | None = None,
+        conversation: list[dict[str, str]] | None = None,
+    ) -> dict:
         """
         Main entry point called by the /api/chat route.
 
@@ -226,6 +235,7 @@ class ChatService:
 
         start = time.perf_counter()
         sources: list[str] = []
+        conversation = conversation or []
 
         special_response = _special_response(text)
         if special_response:
@@ -244,8 +254,18 @@ class ChatService:
         if is_online:
             # ── Step 2: full RAG pipeline ───────────────────────────────────
             try:
-                context_chunks, sources = await asyncio.to_thread(self._retrieve, text)
-                reply = await self._generate_with_retry(text, context_chunks, page_context)
+                retrieval_query = self._build_retrieval_query(
+                    text,
+                    conversation,
+                    page_context,
+                )
+                context_chunks, sources = await asyncio.to_thread(self._retrieve, retrieval_query)
+                reply = await self._generate_with_retry(
+                    text,
+                    context_chunks,
+                    page_context,
+                    conversation,
+                )
                 latency_ms = round((time.perf_counter() - start) * 1000, 1)
                 logger.info("process_message done | source=rag latency_ms=%s", latency_ms)
                 return {
@@ -339,6 +359,7 @@ class ChatService:
         query: str,
         context_chunks: list[str],
         page_context: dict | None = None,
+        conversation: list[dict[str, str]] | None = None,
     ) -> str:
         """
         Call Gemini with exponential-backoff retry for transient API errors.
@@ -349,7 +370,13 @@ class ChatService:
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                return await asyncio.to_thread(self._generate, query, context_chunks, page_context)
+                return await asyncio.to_thread(
+                    self._generate,
+                    query,
+                    context_chunks,
+                    page_context,
+                    conversation or [],
+                )
             except Exception as exc:
                 last_exc = exc
 
@@ -378,6 +405,7 @@ class ChatService:
         query: str,
         context_chunks: list[str],
         page_context: dict | None = None,
+        conversation: list[dict[str, str]] | None = None,
     ) -> str:
         """
         Build the RAG prompt and call Gemini.
@@ -413,9 +441,26 @@ class ChatService:
                 page_section = "\nCURRENT PAGE — TICKET/CASE DETAILS:\n" + "\n".join(lines)
                 logger.debug("Page context injected: %s", list(page_context.keys()))
 
+        conversation_section = ""
+        valid_turns = [
+            turn for turn in (conversation or [])
+            if turn.get("role") in {"user", "assistant"} and turn.get("content", "").strip()
+        ]
+        if valid_turns:
+            transcript = "\n".join(
+                f"{turn['role'].upper()}: {turn['content'][:1200]}"
+                for turn in valid_turns[-12:]
+            )
+            conversation_section = (
+                "\nRECENT CONVERSATION — treat these turns as the same support request. "
+                "Do not ask again for details already provided:\n"
+                f"{transcript}\n"
+            )
+
         user_content = (
             f"{context_section}"
             f"{page_section}"
+            f"{conversation_section}"
             f"\n\nAGENT QUERY:\n{query}"
         )
 
@@ -432,6 +477,27 @@ class ChatService:
                 for part in content
             )
         return content.strip()
+
+    @staticmethod
+    def _build_retrieval_query(
+        query: str,
+        conversation: list[dict[str, str]],
+        page_context: dict | None = None,
+    ) -> str:
+        """Include active conversation and CRM details when retrieving SOP context."""
+        previous_user_turns = [
+            turn.get("content", "").strip()
+            for turn in conversation[-8:]
+            if turn.get("role") == "user" and turn.get("content", "").strip()
+        ]
+        page_terms = []
+        if isinstance(page_context, dict):
+            page_terms = [
+                str(page_context.get(key, "")).strip()
+                for key in ("platform", "subject", "description", "status", "priority", "customer")
+                if page_context.get(key)
+            ]
+        return " ".join((*page_terms, *previous_user_turns, query)).strip()
 
     def _offline_fallback(self, query: str) -> str | None:
         """

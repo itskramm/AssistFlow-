@@ -25,6 +25,20 @@ const WELCOME_MESSAGE = {
   source: null,
 };
 
+function getConversationTurns(messages) {
+  return messages
+    .filter(message => (
+      (message.sender === 'user' || message.sender === 'assistant') &&
+      message.text?.trim() &&
+      message.id !== 'welcome'
+    ))
+    .slice(-12)
+    .map(message => ({
+      role: message.sender,
+      content: message.text.slice(0, 1200),
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Markdown-lite renderer
 // ---------------------------------------------------------------------------
@@ -345,7 +359,10 @@ export default function App() {
     }
 
     // ── Normal path: try the backend ─────────────────────────────────────
-    const body = { message: trimmed };
+    const body = {
+      message: trimmed,
+      conversation: getConversationTurns(messages),
+    };
     if (pageContext && Object.keys(pageContext).length > 0) {
       body.page_context = pageContext;
     }
@@ -394,7 +411,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, pageContext]);
+  }, [isLoading, messages, pageContext]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
