@@ -121,7 +121,7 @@ def ingest() -> None:
     print("Step 4: Storing embeddings in ChromaDB...")
     Path(CHROMA_DB_PATH).mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(
-        path=CHROMA_DB_PATH,
+        path=str(CHROMA_DB_PATH),
         settings=Settings(
             anonymized_telemetry=False,
             chroma_product_telemetry_impl="app.core.chroma_telemetry.NoOpTelemetry",
