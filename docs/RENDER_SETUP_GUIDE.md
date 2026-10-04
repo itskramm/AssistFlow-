@@ -79,10 +79,10 @@ Fill in the configuration:
 | **Name** | `assistflow-backend` |
 | **Region** | Oregon (US West) — *Choose closest to your users* |
 | **Branch** | `main` |
-| **Root Directory** | `backend` |
+| **Root Directory** | Leave blank (repository root) |
 | **Runtime** | Python 3 |
-| **Build Command** | `pip install -r requirements.txt && cd ../scripts && python ingest_knowledge.py` |
-| **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Build Command** | `pip install -r backend/requirements.txt && python scripts/ingest_knowledge.py` |
+| **Start Command** | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | **Instance Type** | Free |
 
 **Advanced Settings:**
@@ -146,7 +146,7 @@ If you don't have one yet:
    ==> Installing dependencies...
    ==> Building...
    ==> Running: pip install -r requirements.txt
-   ==> Running: python ingest_knowledge.py
+   ==> Running: python scripts/ingest_knowledge.py
    ✓ Successfully ingested 8 documents
    ==> Starting service...
    Uvicorn running on http://0.0.0.0:10000
