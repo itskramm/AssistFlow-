@@ -15,7 +15,7 @@ This system is an AI-powered workplace support assistant designed for call cente
 ## Tech Stack Requirements
 *   **Frontend:** React, Tailwind CSS, Chrome Extension API (Manifest V3 - Side Panel).
 *   **Backend:** Python, FastAPI.
-*   **AI/LLM:** Google Gemini API (Gemini 2.5 Flash).
+*   **AI/LLM:** Google Gemini API (Gemini 3.1 Flash Lite).
 *   **RAG/Vector DB:** ChromaDB (local/open-source).
 *   **Orchestration:** LangChain or LlamaIndex.
 *   **Downtime Cache:** SQLite or Redis (Local fallback).

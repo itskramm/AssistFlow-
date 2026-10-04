@@ -201,7 +201,7 @@ curl -X POST https://assistflow-backend.onrender.com/api/chat \
 {
   "response": "Based on the Standard Operating Procedure...",
   "retrieved_chunks": [...],
-  "model_used": "gemini-2.5-flash"
+  "model_used": "gemini-3.1-flash-lite"
 }
 ```
 
@@ -255,7 +255,7 @@ https://assistflow-backend.onrender.com
 ```
 
 **What works:**
-- ✅ RAG queries with Gemini 2.5 Flash
+- ✅ RAG queries with Gemini 3.1 Flash Lite
 - ✅ ChromaDB vector search (8 documents indexed)
 - ✅ Offline FAQ fallback (39 protocols)
 - ✅ Health monitoring

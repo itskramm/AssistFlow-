@@ -13,10 +13,23 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+PROJECT_DIR = BASE_DIR.parent
+
+
+def _configured_path(name: str, default: Path) -> str:
+    value = os.getenv(name)
+    path = Path(value) if value else default
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return str(path.resolve())
+
 
 GEMINI_API_KEY:  str = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY", "")
-CHROMA_DB_PATH:  str = os.getenv("CHROMA_DB_PATH", str(BASE_DIR / "data" / "chroma"))
-OFFLINE_DB_PATH: str = os.getenv("OFFLINE_DB_PATH", str(BASE_DIR / "data" / "offline_cache" / "offline.db"))
+CHROMA_DB_PATH:  str = _configured_path("CHROMA_DB_PATH", PROJECT_DIR / "data" / "chroma")
+OFFLINE_DB_PATH: str = _configured_path(
+    "OFFLINE_DB_PATH",
+    PROJECT_DIR / "data" / "offline_cache" / "offline.db",
+)
 FASTAPI_HOST:    str = os.getenv("FASTAPI_HOST", "0.0.0.0")
 FASTAPI_PORT:    int = int(os.getenv("FASTAPI_PORT", "8000"))
 LOG_LEVEL:       str = os.getenv("LOG_LEVEL", "INFO")

@@ -21,10 +21,14 @@ alter table public.profiles
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Users can view their own profile"
+  on public.profiles;
 create policy "Users can view their own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
+drop policy if exists "Users can update their own profile"
+  on public.profiles;
 create policy "Users can update their own profile"
   on public.profiles for update
   using (auth.uid() = id)
@@ -74,6 +78,19 @@ create table if not exists public.prompt_conversations (
 
 create index if not exists prompt_conversations_user_updated_idx
   on public.prompt_conversations (user_id, updated_at desc);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'prompt_conversations_id_user_key'
+  ) then
+    alter table public.prompt_conversations
+      add constraint prompt_conversations_id_user_key unique (id, user_id);
+  end if;
+end;
+$$;
 
 alter table public.prompt_conversations enable row level security;
 
@@ -129,15 +146,24 @@ alter table public.prompt_history
 
 do $$
 begin
-  if not exists (
+  if exists (
     select 1
     from pg_constraint
     where conname = 'prompt_history_conversation_id_fkey'
   ) then
     alter table public.prompt_history
-      add constraint prompt_history_conversation_id_fkey
-      foreign key (conversation_id)
-      references public.prompt_conversations(id)
+      drop constraint prompt_history_conversation_id_fkey;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'prompt_history_conversation_user_fkey'
+  ) then
+    alter table public.prompt_history
+      add constraint prompt_history_conversation_user_fkey
+      foreign key (conversation_id, user_id)
+      references public.prompt_conversations(id, user_id)
       on delete cascade;
   end if;
 end;
@@ -172,23 +198,78 @@ drop policy if exists "Users can view their own prompt history"
   on public.prompt_history;
 create policy "Users can view their own prompt history"
   on public.prompt_history for select
-  using (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    and (
+      conversation_id is null
+      or exists (
+        select 1
+        from public.prompt_conversations conversations
+        where conversations.id = prompt_history.conversation_id
+          and conversations.user_id = auth.uid()
+      )
+    )
+  );
 
 drop policy if exists "Users can create their own prompt history"
   on public.prompt_history;
 create policy "Users can create their own prompt history"
   on public.prompt_history for insert
-  with check (auth.uid() = user_id);
+  with check (
+    auth.uid() = user_id
+    and (
+      conversation_id is null
+      or exists (
+        select 1
+        from public.prompt_conversations conversations
+        where conversations.id = prompt_history.conversation_id
+          and conversations.user_id = auth.uid()
+      )
+    )
+  );
 
 drop policy if exists "Users can update their own prompt history"
   on public.prompt_history;
 create policy "Users can update their own prompt history"
   on public.prompt_history for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    and (
+      conversation_id is null
+      or exists (
+        select 1
+        from public.prompt_conversations conversations
+        where conversations.id = prompt_history.conversation_id
+          and conversations.user_id = auth.uid()
+      )
+    )
+  )
+  with check (
+    auth.uid() = user_id
+    and (
+      conversation_id is null
+      or exists (
+        select 1
+        from public.prompt_conversations conversations
+        where conversations.id = prompt_history.conversation_id
+          and conversations.user_id = auth.uid()
+      )
+    )
+  );
 
 drop policy if exists "Users can delete their own prompt history"
   on public.prompt_history;
 create policy "Users can delete their own prompt history"
   on public.prompt_history for delete
-  using (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    and (
+      conversation_id is null
+      or exists (
+        select 1
+        from public.prompt_conversations conversations
+        where conversations.id = prompt_history.conversation_id
+          and conversations.user_id = auth.uid()
+      )
+    )
+  );

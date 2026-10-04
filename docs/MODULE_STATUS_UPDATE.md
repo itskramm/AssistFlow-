@@ -14,7 +14,7 @@
 | **Module 2: Chrome Extension** | 🟢 Operational | 100% | Repositioned as optional | None |
 | **Module 3: Backend API** | 🟢 Operational | 100% | Running on PID 11868 | None |
 | **Module 4: RAG Pipeline** | 🟢 Operational | 100% | 8 docs indexed | None |
-| **Module 5: AI Generation** | 🟢 Operational | 100% | Gemini 2.5 Flash live | API key required |
+| **Module 5: AI Generation** | 🟢 Operational | 100% | Gemini 3.1 Flash Lite live | API key required |
 | **Module 6: Offline System** | 🟢 Operational | 100% | Dual-layer (39 protocols) | None |
 | **Module 7: Evaluation** | 🟡 Ready | 80% | Script ready, not run | Needs execution |
 | **Module 8: Documentation** | 🟢 Complete | 100% | 5 major docs added | None |
@@ -239,7 +239,7 @@ Response: {
     {"content": "...", "metadata": {"source": "sop_crm_login_access.md"}},
     ...
   ],
-  "model_used": "gemini-2.5-flash"
+  "model_used": "gemini-3.1-flash-lite"
 }
 ```
 
@@ -405,12 +405,12 @@ langchain-google-genai==2.0.0
 
 ---
 
-## Module 5: AI Generation (Gemini 2.5 Flash)
+## Module 5: AI Generation (Gemini 3.1 Flash Lite)
 
 ### ✅ What's Working
 
 **Model Configuration:**
-- ✅ Model: `gemini-2.5-flash`
+- ✅ Model: `gemini-3.1-flash-lite`
 - ✅ Provider: Google Generative AI
 - ✅ Temperature: 0.7 (balanced creativity/accuracy)
 - ✅ Max Tokens: 2048
@@ -433,7 +433,7 @@ Query: {user_query}
 1. ✅ Query embedding with Gemini
 2. ✅ Retrieve top 5 relevant chunks from ChromaDB
 3. ✅ Construct context-aware prompt
-4. ✅ Generate response with Gemini 2.5 Flash
+4. ✅ Generate response with Gemini 3.1 Flash Lite
 5. ✅ Stream tokens to frontend
 6. ✅ Fallback to offline FAQ if API fails
 
@@ -449,7 +449,7 @@ Query: {user_query}
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-3.1-flash-lite",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
     temperature=0.7,
     max_output_tokens=2048

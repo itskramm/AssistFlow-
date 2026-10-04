@@ -67,7 +67,10 @@ protected `profiles` table, the per-user `prompt_conversations` and
 `prompt_history` tables, and the trigger
 that creates a profile row for each new user. Prompt history is linked to the
 authenticated user's ID and grouped into conversations protected by Row Level
-Security, so users cannot read or modify another user's chats. The profile
+Security. Composite ownership constraints ensure a history row cannot be
+attached to another user's conversation, and the app clears stale messages and
+invalidates in-flight history loads when the signed-in user changes. Users
+cannot read or modify another user's chats. The profile
 dropdown shows the user's name, email, and role.
 Only the Supabase URL and publishable/anonymous public key belong in Vite
 variables; never expose a Supabase service-role or secret key in the browser.

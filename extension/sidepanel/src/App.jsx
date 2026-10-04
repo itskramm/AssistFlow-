@@ -125,6 +125,7 @@ const SOURCE_LABELS = {
   'rag':           { label: 'AI · SOP',        cls: 'source-rag'     },
   'offline-cache': { label: 'Offline cache',    cls: 'source-offline' },
   'fallback':      { label: 'No connection',    cls: 'source-fallback'},
+  'scope':         { label: 'Supported topics', cls: 'source-rag'   },
 };
 
 function SourceBadge({ source }) {
@@ -393,7 +394,9 @@ export default function App() {
         latency_ms: data.latency_ms,
         userText:   trimmed,
       }]);
-      setStatus(data.source === 'rag' ? 'Online' : 'Offline');
+      setStatus(data.source === 'rag' || data.source === 'scope'
+        ? 'Online'
+        : 'Offline');
     } catch {
       // ── Fetch failed — mark offline, serve FAQ instantly ───────────────
       isOffline.current = true;

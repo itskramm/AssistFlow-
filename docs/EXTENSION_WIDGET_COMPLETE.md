@@ -321,7 +321,7 @@ Built as part of the AssistFlow project - AI-powered workplace support system.
 - Frontend: Vanilla JavaScript (no framework needed)
 - UI: HTML5 + CSS3 with animations
 - Backend: FastAPI + Python
-- AI: Google Gemini 2.5 Flash
+- AI: Google Gemini 3.1 Flash Lite
 - Vector DB: ChromaDB
 - Hosting: Render (backend) + Chrome Extension Store
 

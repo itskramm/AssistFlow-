@@ -177,7 +177,7 @@
 
 ## Module 4: Generative AI & Orchestration
 
-**Tech Stack:** Google Gemini 2.5 Flash (via langchain-google-genai 2.0), LangChain 0.3.1  
+**Tech Stack:** Google Gemini 3.1 Flash Lite (via langchain-google-genai 2.0), LangChain 0.3.1
 **Purpose:** Synthesizes retrieved SOPs and user queries into grounded, step-by-step responses. Core of the RAG pipeline.
 
 **Files:** `backend/app/services/chat_service.py`
@@ -188,7 +188,7 @@
 | google-generativeai 0.7.2 installed | ✅ |
 | langchain-google-genai 2.0.0 installed | ✅ |
 | GEMINI_API_KEY loaded from .env | ✅ |
-| ChatGoogleGenerativeAI (Gemini 2.5 Flash, temp 0.2) | ✅ |
+| ChatGoogleGenerativeAI (Gemini 3.1 Flash Lite, temp 0.2) | ✅ |
 | **RAG Pipeline** | |
 | System prompt (restricts to retrieved context) | ✅ |
 | Enforces step-by-step format | ✅ |

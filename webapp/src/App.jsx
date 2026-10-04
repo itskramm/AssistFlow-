@@ -94,9 +94,10 @@ function TopicList({ onSelect }) {
 // Source badge
 // ---------------------------------------------------------------------------
 const SOURCE_LABELS = {
-  'rag':           { label: 'AI · SOP',      cls: 'source-rag'     },
-  'offline-cache': { label: 'Offline cache', cls: 'source-offline' },
-  'fallback':      { label: 'No connection', cls: 'source-fallback' },
+  'rag':           { label: 'AI · SOP',        cls: 'source-rag'     },
+  'offline-cache': { label: 'Offline cache',    cls: 'source-offline' },
+  'fallback':      { label: 'No connection',    cls: 'source-fallback'},
+  'scope':         { label: 'Supported topics', cls: 'source-rag'     },
   'help':          { label: 'Assistant',     cls: 'source-rag'     },
 };
 
@@ -642,6 +643,7 @@ export default function App() {
   const sideInputRef = useRef(null);
   const isOffline   = useRef(false);
   const chatRequestVersion = useRef(0);
+  const historyLoadVersion = useRef(0);
 
   useEffect(() => {
     if (!supabase) {
@@ -714,6 +716,7 @@ export default function App() {
   const loadConversation = useCallback(async (conversationId, shouldScroll = false) => {
     const userId = session?.user?.id;
     if (!supabase || !userId || !conversationId) return;
+    const loadVersion = ++historyLoadVersion.current;
 
     const { data, error } = await supabase
       .from('prompt_history')
@@ -727,6 +730,12 @@ export default function App() {
       console.error('Unable to load conversation:', error);
       return;
     }
+    if (
+      loadVersion !== historyLoadVersion.current
+      || session?.user?.id !== userId
+    ) {
+      return;
+    }
 
     setMessages(promptHistoryRowsToMessages(data || []));
     setActiveConversationId(conversationId);
@@ -737,6 +746,19 @@ export default function App() {
       requestAnimationFrame(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }));
     }
   }, [promptHistoryRowsToMessages, session?.user?.id]);
+
+  // Clear the previous user's chat immediately on account changes and
+  // invalidate any history request that is still in flight.
+  useEffect(() => {
+    historyLoadVersion.current += 1;
+    chatRequestVersion.current += 1;
+    setMessages([]);
+    setSideMessages([]);
+    setChatMode(false);
+    setConversations([]);
+    setActiveConversationId(null);
+    setSelectedHistoryId(null);
+  }, [session?.user?.id]);
 
   // Restore this user's conversation list and most recent conversation.
   useEffect(() => {
@@ -860,11 +882,16 @@ export default function App() {
   ), [activeConversationId, createConversation]);
 
   const handleLogout = useCallback(async () => {
+    historyLoadVersion.current += 1;
+    chatRequestVersion.current += 1;
     if (supabase) await supabase.auth.signOut();
     setMessages([]);
     setSideMessages([]);
     setChatMode(false);
     setSidebarOpen(false);
+    setConversations([]);
+    setActiveConversationId(null);
+    setSelectedHistoryId(null);
   }, []);
 
   const authHeaders = useCallback(() => (
@@ -999,7 +1026,9 @@ export default function App() {
             : message
         )));
       }
-      setStatus(data.source === 'rag' ? 'Online' : 'Offline');
+      setStatus(data.source === 'rag' || data.source === 'scope' || data.source === 'help'
+        ? 'Online'
+        : 'Offline');
     } catch {
       isOffline.current = true;
       setStatus('Offline');
@@ -1168,8 +1197,9 @@ export default function App() {
   };
 
   const selectHistory = useCallback((conversationId) => {
+    if (!conversations.some(conversation => conversation.id === conversationId)) return;
     loadConversation(conversationId, true);
-  }, [loadConversation]);
+  }, [conversations, loadConversation]);
 
   if (authLoading) {
     return <main className="login-page"><p className="login-loading">Loading…</p></main>;
@@ -1324,7 +1354,7 @@ export default function App() {
                   </button>
                 </div>
                 <p className="composer-hint">
-                  39 offline protocols · Powered by Gemini 2.5 Flash
+                  39 offline protocols · Powered by Gemini 3.1 Flash Lite
                 </p>
               </form>
 
