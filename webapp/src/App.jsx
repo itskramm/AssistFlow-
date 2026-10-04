@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { searchFaq, getTopicList } from './offlineFaq.js';
+import { isSupabaseConfigured, supabase } from './supabaseClient.js';
 
 const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow-backend-ctbq.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
@@ -192,10 +193,348 @@ function TypingRow() {
   );
 }
 
+function LoginScreen() {
+  const [mode, setMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birthday, setBirthday] = useState('');
+  const [address, setAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const isSignUp = mode === 'signup';
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!supabase) return;
+    if (!email.trim() || !password) {
+      setError('Enter your email and password.');
+      return;
+    }
+    if (isSignUp && !fullName.trim()) {
+      setError('Enter your full name.');
+      return;
+    }
+    if (isSignUp && !phone.trim()) {
+      setError('Enter your phone number.');
+      return;
+    }
+    if (isSignUp && !birthday) {
+      setError('Enter your birthday.');
+      return;
+    }
+    if (isSignUp && !address.trim()) {
+      setError('Enter your address.');
+      return;
+    }
+    if (isSignUp && password.length < 8) {
+      setError('Use a password with at least 8 characters.');
+      return;
+    }
+    if (isSignUp && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setError('');
+    setNotice('');
+    setIsSubmitting(true);
+    if (isSignUp) {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+            birthday,
+            address: address.trim(),
+          },
+        },
+      });
+      if (signUpError) {
+        setError(signUpError.message);
+      } else if (!data.session) {
+        setAwaitingOtp(true);
+        setNotice('We sent a verification code to your email.');
+        setPassword('');
+        setConfirmPassword('');
+      }
+    } else {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) setError(signInError.message);
+    }
+    setIsSubmitting(false);
+  };
+
+  const switchMode = () => {
+    setMode(isSignUp ? 'login' : 'signup');
+    setError('');
+    setNotice('');
+    setPassword('');
+    setConfirmPassword('');
+    setFullName('');
+    setPhone('');
+    setBirthday('');
+    setAddress('');
+    setOtp('');
+    setAwaitingOtp(false);
+  };
+
+  const verifyEmailOtp = async (event) => {
+    event.preventDefault();
+    if (!supabase || !otp.trim()) {
+      setError('Enter the verification code from your email.');
+      return;
+    }
+
+    setError('');
+    setIsSubmitting(true);
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: otp.trim(),
+      type: 'signup',
+    });
+    if (verifyError) {
+      setError(verifyError.message);
+    } else {
+      setAwaitingOtp(false);
+      setNotice('Email verified. You can now sign in.');
+      setMode('login');
+      setPassword('');
+      setOtp('');
+    }
+    setIsSubmitting(false);
+  };
+
+  const resendEmailOtp = async () => {
+    if (!supabase || !email.trim()) return;
+    setError('');
+    setNotice('');
+    setIsSubmitting(true);
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+    });
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setNotice('A new verification code was sent.');
+    }
+    setIsSubmitting(false);
+  };
+
+  return (
+    <main className="login-page">
+      <section className="login-card" aria-labelledby="login-title">
+        <img className="login-logo" src="/bubble-logo.png" alt="SmartOpsSupportHub" />
+        <p className="login-eyebrow">WORKPLACE SUPPORT</p>
+        <h1 id="login-title">{isSignUp ? 'Create your account' : 'Welcome back'}</h1>
+        <p className="login-subtitle">
+          {isSignUp
+            ? 'Create an account to start using SmartOpsSupportHub.'
+            : 'Sign in to access SmartOpsSupportHub.'}
+        </p>
+
+        {!isSupabaseConfigured ? (
+          <p className="login-error" role="alert">
+            Supabase is not configured. Add the VITE_SUPABASE_URL and
+            VITE_SUPABASE_ANON_KEY environment variables.
+          </p>
+        ) : awaitingOtp ? (
+          <form className="login-form" onSubmit={verifyEmailOtp}>
+            <label htmlFor="login-otp">Email verification code</label>
+            <input
+              id="login-otp"
+              type="text"
+              value={otp}
+              onChange={event => setOtp(event.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="Enter the code from your email"
+              autoFocus
+            />
+            {error && <p className="login-error" role="alert">{error}</p>}
+            <button className="login-submit" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Verifying…' : 'Verify email'}
+            </button>
+            <p className="login-switch">
+              Didn’t receive it?{' '}
+              <button type="button" onClick={resendEmailOtp} disabled={isSubmitting}>
+                Resend code
+              </button>{' '}
+              or{' '}
+              <button type="button" onClick={() => setAwaitingOtp(false)}>
+                Back to sign up
+              </button>
+            </p>
+          </form>
+        ) : (
+          <form className="login-form" onSubmit={handleSubmit}>
+            {isSignUp && (
+              <>
+                <label htmlFor="login-full-name">Full name</label>
+                <input
+                  id="login-full-name"
+                  type="text"
+                  value={fullName}
+                  onChange={event => setFullName(event.target.value)}
+                  autoComplete="name"
+                  placeholder="Your full name"
+                  autoFocus
+                />
+                <label htmlFor="login-phone">Phone number</label>
+                <input
+                  id="login-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={event => setPhone(event.target.value)}
+                  autoComplete="tel"
+                  placeholder="+1 555 123 4567"
+                />
+                <label htmlFor="login-birthday">Birthday</label>
+                <input
+                  id="login-birthday"
+                  type="date"
+                  value={birthday}
+                  onChange={event => setBirthday(event.target.value)}
+                  autoComplete="bday"
+                />
+                <label htmlFor="login-address">Address</label>
+                <textarea
+                  id="login-address"
+                  value={address}
+                  onChange={event => setAddress(event.target.value)}
+                  autoComplete="street-address"
+                  placeholder="Your address"
+                  rows="3"
+                />
+              </>
+            )}
+            <label htmlFor="login-email">Work email</label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={event => setEmail(event.target.value)}
+              autoComplete="email"
+              placeholder="you@company.com"
+              autoFocus={!isSignUp}
+            />
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              placeholder="Enter your password"
+            />
+            {isSignUp && (
+              <>
+                <label htmlFor="login-confirm-password">Confirm password</label>
+                <input
+                  id="login-confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={event => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password"
+                />
+                <p className="login-field-hint">Use at least 8 characters.</p>
+              </>
+            )}
+            {error && <p className="login-error" role="alert">{error}</p>}
+            {notice && <p className="login-notice" role="status">{notice}</p>}
+            <button className="login-submit" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+            </button>
+            <p className="login-switch">
+              {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
+              <button type="button" onClick={switchMode}>
+                {isSignUp ? 'Sign in' : 'Create one'}
+              </button>
+            </p>
+          </form>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function AccountMenu({ profile, email, onLogout }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const displayName = profile?.full_name || email?.split('@')[0] || 'Account';
+  const initials = displayName
+    .split(/\s+/)
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div className="account-menu">
+      <button
+        className="account-button"
+        type="button"
+        onClick={() => setIsOpen(open => !open)}
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+      >
+        <span className="account-avatar">{initials}</span>
+        <span className="account-button-name">{displayName}</span>
+        <span className="account-chevron" aria-hidden="true">⌄</span>
+      </button>
+      {isOpen && (
+        <div className="account-dropdown" role="menu">
+          <div className="account-dropdown-header">
+            <span className="account-avatar account-avatar-large">{initials}</span>
+            <div>
+              <strong>{displayName}</strong>
+              <span>{email}</span>
+            </div>
+          </div>
+          <div className="account-profile-row">
+            <span>Profile</span>
+            <span>{profile?.role || 'Support agent'}</span>
+          </div>
+          <div className="account-profile-row">
+            <span>Phone</span>
+            <span>{profile?.phone_number || 'Not provided'}</span>
+          </div>
+          <div className="account-profile-row">
+            <span>Birthday</span>
+            <span>{profile?.birthday || 'Not provided'}</span>
+          </div>
+          <div className="account-profile-row">
+            <span>Address</span>
+            <span>{profile?.address || 'Not provided'}</span>
+          </div>
+          <button className="account-signout" type="button" onClick={onLogout} role="menuitem">
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
   const [messages,   setMessages]   = useState([]);
   const [sideMessages, setSideMessages] = useState([]);
   const [sideInput,  setSideInput]  = useState('');
@@ -218,6 +557,62 @@ export default function App() {
   const inputRef    = useRef(null);
   const sideInputRef = useRef(null);
   const isOffline   = useRef(false);
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (active) {
+        setSession(currentSession);
+        setAuthLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => setSession(nextSession)
+    );
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !session?.user) {
+      setProfile(null);
+      return undefined;
+    }
+
+    let active = true;
+    supabase
+      .from('profiles')
+      .select('full_name, email, phone_number, birthday, address, role, avatar_url')
+      .eq('id', session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setProfile(data);
+      });
+
+    return () => { active = false; };
+  }, [session]);
+
+  const handleLogout = useCallback(async () => {
+    if (supabase) await supabase.auth.signOut();
+    setMessages([]);
+    setSideMessages([]);
+    setChatMode(false);
+    setSidebarOpen(false);
+  }, []);
+
+  const authHeaders = useCallback(() => (
+    session?.access_token
+      ? { Authorization: `Bearer ${session.access_token}` }
+      : {}
+  ), [session]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -293,7 +688,7 @@ export default function App() {
       const tid  = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
       const res  = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ message: trimmed }),
         signal: ctrl.signal,
       });
@@ -353,7 +748,7 @@ export default function App() {
       const tid  = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
       const res  = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ message: trimmed }),
         signal: ctrl.signal,
       });
@@ -386,11 +781,11 @@ export default function App() {
     try {
       await fetch(`${BACKEND_URL}/api/feedback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ message: user?.text || '', reply: msg.text, rating: rating === 'up' ? 1 : 2 }),
       });
     } catch { /**/ }
-  }, [messages]);
+  }, [authHeaders, messages]);
 
   // ── New chat ──
   const newChat = () => {
@@ -399,6 +794,12 @@ export default function App() {
     setInput('');
     setTimeout(() => inputRef.current?.focus(), 50);
   };
+
+  if (authLoading) {
+    return <main className="login-page"><p className="login-loading">Loading…</p></main>;
+  }
+
+  if (!session) return <LoginScreen />;
 
   return (
     <div className="app-shell">
@@ -486,6 +887,11 @@ export default function App() {
           <button className="topbar-icon-btn" onClick={() => setDarkMode(d => !d)} aria-label="Toggle dark mode">
             {darkMode ? '☀️' : '🌙'}
           </button>
+          <AccountMenu
+            profile={profile}
+            email={session.user.email}
+            onLogout={handleLogout}
+          />
         </div>
       </header>
 

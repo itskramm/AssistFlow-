@@ -10,6 +10,8 @@ Standalone web version of the AssistFlow Chrome extension. This provides the sam
 - **Real-time AI assistance** via the FastAPI backend
 - **Auto-recovery** from offline mode
 - **Dark mode** support
+- **Supabase email/password login and sign-up** with email OTP verification
+- **Supabase profiles** with an account dropdown in the main page
 - **Responsive design** — works on desktop and tablets
 
 ## Quick Start
@@ -36,6 +38,33 @@ source .venv/bin/activate
 python run.py
 ```
 
+### 4. Configure Supabase authentication
+
+Create a Supabase project and enable **Email** under Authentication → Providers.
+The signup form stores the user's full name, phone number, birthday, and address
+in the protected `profiles` table. Passwords are stored only by Supabase Auth;
+they must never be added to `profiles`.
+Then copy `webapp/.env.example` to `.env.local` and set:
+
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+The app displays the login/sign-up page until a valid Supabase session exists.
+New users receive an email verification OTP after signup. In the Supabase
+dashboard, configure the Confirm signup email template to include
+`{{ .Token }}` and keep email confirmation enabled. The app verifies the code
+with `supabase.auth.verifyOtp({ type: 'signup' })`.
+You can also use the Supabase dashboard's Authentication → Users page to
+create accounts directly.
+
+Run `supabase/schema.sql` in the Supabase SQL Editor to create or update the
+protected `profiles` table and the trigger that creates a profile row for each
+new user. The profile dropdown shows the user's name, email, and role.
+Only the Supabase URL and anonymous public key belong in Vite variables; never
+expose a Supabase service-role key in the browser.
+
 ## Build for Production
 
 ```bash
@@ -60,7 +89,8 @@ webapp/
 │   ├── App.jsx             # Main chat component (same logic as extension)
 │   ├── main.jsx            # Entry point with layout wrapper
 │   ├── index.css           # Styles (same as extension + web-specific)
-│   └── offlineFaq.js       # Local FAQ for offline mode
+│   ├── offlineFaq.js       # Local FAQ for offline mode
+│   └── supabaseClient.js   # Supabase browser client and configuration check
 ├── index.html
 ├── vite.config.js
 ├── tailwind.config.js
@@ -92,6 +122,14 @@ const BACKEND_URL = 'http://127.0.0.1:8000';
 ```
 
 Change this if your backend is running on a different host/port.
+
+For Vercel, add these environment variables in Project Settings → Environment
+Variables, then redeploy:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
 
 ## Development
 
