@@ -178,7 +178,7 @@ export default function App() {
   const [input,     setInput]     = useState('');
   const [status,    setStatus]    = useState('Online');
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed
   const [darkMode,  setDarkMode]  = useState(() => {
     try {
       const stored = localStorage.getItem('assistflow-dark');
@@ -341,6 +341,15 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Backdrop overlay when sidebar is open */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar with chat */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
@@ -405,17 +414,16 @@ export default function App() {
 
       {/* Main content area */}
       <div className="main-area">
-        {/* Toggle button - always visible */}
-        {!sidebarOpen && (
-          <button
-            className="sidebar-toggle-btn floating"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open sidebar"
-            title="Open chat"
-          >
-            💬
-          </button>
-        )}
+        {/* Floating chat button - always visible */}
+        <button
+          className={`floating-chat-bubble ${sidebarOpen ? 'hidden' : ''}`}
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open chat"
+          title="Chat with AssistFlow AI"
+        >
+          <span className="bubble-icon">💬</span>
+          <span className="bubble-pulse"></span>
+        </button>
 
         <div className="main-content-wrapper">
           <div className="welcome-section">

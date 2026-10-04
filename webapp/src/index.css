@@ -126,31 +126,57 @@ html, body, #root {
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 
 /* -------------------------------------------------------------------------
-   Layout - New sidebar + centered chat
+   Layout - Sidebar with backdrop overlay
    ------------------------------------------------------------------------- */
 .app-container {
   display: flex;
   height: 100vh;
   background: var(--bg-app);
   overflow: hidden;
+  position: relative;
 }
 
-/* Sidebar */
+/* Backdrop overlay */
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Sidebar - slides from right */
 .sidebar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
   width: 400px;
   background: var(--bg-topbar);
-  border-right: 1px solid var(--border-base);
+  border-left: 1px solid var(--border-base);
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease;
   flex-shrink: 0;
-  z-index: 10;
-  position: relative;
+  z-index: 1000;
   height: 100vh;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar.closed {
-  transform: translateX(-100%);
+  transform: translateX(100%);
+}
+
+.sidebar.open {
+  transform: translateX(0);
 }
 
 .sidebar-header {
@@ -374,41 +400,88 @@ html, body, #root {
   border-color: #2563eb;
 }
 
-/* Main content area */
+/* Main content area - full width */
 .main-area {
   flex: 1;
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   position: relative;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-/* Floating toggle button */
-.sidebar-toggle-btn.floating {
+/* Floating chat bubble - always visible */
+.floating-chat-bubble {
   position: fixed;
-  top: 20px;
-  left: 20px;
-  width: 60px;
-  height: 60px;
+  bottom: 24px;
+  right: 24px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #fff;
-  font-size: 1.8rem;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s ease;
+  position: relative;
+  animation: float 3s ease-in-out infinite;
 }
 
-.sidebar-toggle-btn.floating:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+.floating-chat-bubble:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.5);
+}
+
+.floating-chat-bubble.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0);
+}
+
+.bubble-icon {
+  font-size: 1.8rem;
+  position: relative;
+  z-index: 2;
+}
+
+/* Pulse animation for the bubble */
+.bubble-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  opacity: 0.6;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.3;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .main-content-wrapper {
@@ -543,22 +616,8 @@ html, body, #root {
 /* Responsive design */
 @media (max-width: 768px) {
   .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    height: 100vh;
-    z-index: 1000;
-    box-shadow: 2px 0 20px rgba(0,0,0,0.2);
-  }
-  
-  .sidebar.closed {
-    transform: translateX(-100%);
-    box-shadow: none;
-  }
-  
-  .main-area {
     width: 100%;
+    max-width: 400px;
   }
   
   .main-title {
@@ -569,16 +628,19 @@ html, body, #root {
     grid-template-columns: 1fr;
   }
   
-  /* Add overlay when sidebar is open on mobile */
-  .sidebar.open ~ .main-area::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 99;
+  .topic-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .floating-chat-bubble {
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+  }
+  
+  .bubble-icon {
+    font-size: 1.6rem;
   }
 }
 
