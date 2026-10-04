@@ -157,8 +157,26 @@ function MessageRow({ message, onFeedback, onRetry, onTopicSelect }) {
 }
 
 // ---------------------------------------------------------------------------
-// Typing indicator
+// Sidebar message bubble (compact, no avatar)
 // ---------------------------------------------------------------------------
+function SideMessage({ message, onTopicSelect }) {
+  const isUser   = message.sender === 'user';
+  const isTopics = message.source === 'offline-topics';
+  const steps    = !isUser && !isTopics ? parseSteps(message.text) : null;
+
+  return (
+    <div className={`side-msg-row ${isUser ? 'side-msg-user' : 'side-msg-assistant'}`}>
+      <div className={`side-msg-bubble ${isUser ? 'side-bubble-user' : 'side-bubble-assistant'}`}>
+        {isTopics
+          ? <TopicList onSelect={onTopicSelect} />
+          : steps
+            ? <ol className="steps-list">{steps.map((s, i) => <li key={i}><InlineText text={s} /></li>)}</ol>
+            : <p className="bubble-text"><InlineText text={message.text} /></p>
+        }
+      </div>
+    </div>
+  );
+}
 function TypingRow() {
   return (
     <div className="msg-row msg-assistant">
@@ -178,12 +196,16 @@ function TypingRow() {
 // Main App
 // ---------------------------------------------------------------------------
 export default function App() {
-  const [messages,  setMessages]  = useState([]);
-  const [input,     setInput]     = useState('');
-  const [status,    setStatus]    = useState('Online');
-  const [isLoading, setIsLoading] = useState(false);
-  const [chatMode,  setChatMode]  = useState(false); // false = home, true = chat
-  const [darkMode,  setDarkMode]  = useState(() => {
+  const [messages,   setMessages]   = useState([]);
+  const [sideMessages, setSideMessages] = useState([]);
+  const [sideInput,  setSideInput]  = useState('');
+  const [sideLoading, setSideLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [input,      setInput]      = useState('');
+  const [status,     setStatus]     = useState('Online');
+  const [isLoading,  setIsLoading]  = useState(false);
+  const [chatMode,   setChatMode]   = useState(false);
+  const [darkMode,   setDarkMode]   = useState(() => {
     try {
       const s = localStorage.getItem('assistflow-dark');
       if (s !== null) return s === 'true';
@@ -192,7 +214,9 @@ export default function App() {
   });
 
   const chatEndRef  = useRef(null);
+  const sideEndRef  = useRef(null);
   const inputRef    = useRef(null);
+  const sideInputRef = useRef(null);
   const isOffline   = useRef(false);
 
   useEffect(() => {
@@ -219,6 +243,16 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Auto-scroll sidebar
+  useEffect(() => {
+    sideEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [sideMessages, sideLoading]);
+
+  // Focus side input when sidebar opens
+  useEffect(() => {
+    if (sidebarOpen) setTimeout(() => sideInputRef.current?.focus(), 150);
+  }, [sidebarOpen]);
 
   // Focus input when switching to chat mode
   useEffect(() => {
@@ -293,6 +327,56 @@ export default function App() {
   const handleRetry       = useCallback(t => { if (t) sendMessage(t); }, [sendMessage]);
   const handleTopicSelect = useCallback(l => sendMessage(l), [sendMessage]);
 
+  // ── Sidebar send ──
+  const sendSideMessage = useCallback(async (text) => {
+    const trimmed = (text || '').trim();
+    if (!trimmed || sideLoading) return;
+
+    const userMsg = { id: Date.now(), sender: 'user', text: trimmed, source: null };
+    setSideMessages(prev => [...prev, userMsg]);
+    setSideInput('');
+    setSideLoading(true);
+
+    if (isOffline.current) {
+      const { answer, matched } = searchFaq(trimmed);
+      setSideMessages(prev => [...prev, {
+        id: Date.now() + 1, sender: 'assistant',
+        text: matched ? answer : '', source: matched ? 'offline-cache' : 'offline-topics',
+        userText: trimmed,
+      }]);
+      setSideLoading(false);
+      return;
+    }
+
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      const res  = await fetch(`${BACKEND_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: trimmed }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSideMessages(prev => [...prev, {
+        id: Date.now() + 1, sender: 'assistant',
+        text: data.reply || 'No guidance returned.',
+        source: data.source || 'rag', userText: trimmed,
+      }]);
+    } catch {
+      const { answer, matched } = searchFaq(trimmed);
+      setSideMessages(prev => [...prev, {
+        id: Date.now() + 1, sender: 'assistant',
+        text: matched ? answer : '', source: matched ? 'offline-cache' : 'offline-topics',
+        userText: trimmed,
+      }]);
+    } finally {
+      setSideLoading(false);
+    }
+  }, [sideLoading]);
+
   const handleFeedback = useCallback(async (messageId, rating) => {
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, feedback: rating } : m));
     const msg  = messages.find(m => m.id === messageId);
@@ -318,6 +402,71 @@ export default function App() {
 
   return (
     <div className="app-shell">
+
+      {/* ── Floating bubble button ── */}
+      <button
+        className={`floating-bubble ${sidebarOpen ? 'bubble-hidden' : ''}`}
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open assistant"
+        title="Open AssistFlow assistant"
+      >
+        <img src="/bubble-logo.png" alt="" className="bubble-img" />
+      </button>
+
+      {/* ── Sidebar backdrop ── */}
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+      )}
+
+      {/* ── Sidebar panel ── */}
+      <aside className={`sidebar-panel ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-header-left">
+            <img src="/bubble-logo.png" alt="AssistFlow" className="sidebar-avatar" />
+            <div>
+              <p className="sidebar-title">AssistFlow</p>
+              <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>{status}</span>
+            </div>
+          </div>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close">✕</button>
+        </div>
+
+        <div className="sidebar-messages">
+          {sideMessages.length === 0 && (
+            <div className="sidebar-empty">
+              <p>👋 Hi! Ask me anything about workplace procedures.</p>
+            </div>
+          )}
+          {sideMessages.map(msg => (
+            <SideMessage key={msg.id} message={msg}
+              onTopicSelect={t => sendSideMessage(t)} />
+          ))}
+          {sideLoading && (
+            <div className="side-msg-row side-msg-assistant">
+              <div className="side-bubble-assistant loading-bubble">
+                <span className="dot" /><span className="dot" /><span className="dot" />
+              </div>
+            </div>
+          )}
+          <div ref={sideEndRef} />
+        </div>
+
+        <form className="sidebar-composer"
+          onSubmit={e => { e.preventDefault(); sendSideMessage(sideInput); }}>
+          <input
+            ref={sideInputRef}
+            type="text"
+            value={sideInput}
+            onChange={e => setSideInput(e.target.value)}
+            placeholder="Ask a question…"
+            disabled={sideLoading}
+            aria-label="Sidebar message"
+          />
+          <button type="submit" disabled={sideLoading || !sideInput.trim()} aria-label="Send">
+            {sideLoading ? '…' : '↑'}
+          </button>
+        </form>
+      </aside>
 
       {/* ── Topbar ── */}
       <header className="topbar">
