@@ -341,106 +341,30 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
+      {/* Sidebar with chat */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <div>
             <p className="eyebrow">AI Support System</p>
             <h2 className="sidebar-title">AssistFlow</h2>
           </div>
-          <button
-            className="sidebar-toggle"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
-            title="Close sidebar"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="sidebar-content">
-          <div className="sidebar-section">
-            <h3 className="section-title">Quick Topics</h3>
-            <div className="quick-topics">
-              <button className="topic-chip" onClick={() => sendMessage("How do I reset my CRM password?")}>
-                🔑 CRM Password Reset
-              </button>
-              <button className="topic-chip" onClick={() => sendMessage("System is running slow")}>
-                ⚡ System Slowness
-              </button>
-              <button className="topic-chip" onClick={() => sendMessage("Call quality issues")}>
-                📞 Call Quality
-              </button>
-              <button className="topic-chip" onClick={() => sendMessage("VPN disconnected")}>
-                🌐 VPN Issues
-              </button>
-              <button className="topic-chip" onClick={() => sendMessage("How do I escalate a ticket?")}>
-                📋 Ticket Escalation
-              </button>
-              <button className="topic-chip" onClick={() => sendMessage("Customer identity verification")}>
-                🆔 Identity Verification
-              </button>
-            </div>
-          </div>
-
-          <div className="sidebar-section">
-            <h3 className="section-title">Statistics</h3>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-value">{messages.filter(m => m.sender === 'user').length}</div>
-                <div className="stat-label">Questions Asked</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">{messages.filter(m => m.source === 'rag').length}</div>
-                <div className="stat-label">AI Responses</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="sidebar-section">
-            <h3 className="section-title">Settings</h3>
-            <div className="settings-list">
-              <button
-                className="setting-item"
-                onClick={() => setDarkMode(d => !d)}
-              >
-                <span>{darkMode ? '☀️' : '🌙'}</span>
-                <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-              </button>
-              <button
-                className="setting-item"
-                onClick={() => setMessages([WELCOME_MESSAGE])}
-              >
-                <span>🗑️</span>
-                <span>Clear Chat</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main chat area */}
-      <div className="main-area">
-        <header className="chat-header" role="banner">
-          {!sidebarOpen && (
-            <button
-              className="sidebar-toggle open-btn"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open sidebar"
-              title="Open sidebar"
-            >
-              ☰
-            </button>
-          )}
-          <div className="chat-header-content">
-            <h1 className="chat-title">AssistFlow Assistant</h1>
+          <div className="header-actions">
             <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
               {status}
             </span>
+            <button
+              className="sidebar-toggle"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close sidebar"
+              title="Close sidebar"
+            >
+              ✕
+            </button>
           </div>
-        </header>
+        </div>
 
-        <main className="chat-panel" role="list" aria-label="Conversation">
+        {/* Chat in sidebar */}
+        <main className="sidebar-chat" role="list" aria-label="Conversation">
           {messages.map((msg) => (
             <MessageBubble
               key={msg.id}
@@ -462,13 +386,14 @@ export default function App() {
           <div ref={chatEndRef} />
         </main>
 
-        <form className="composer" onSubmit={handleSubmit} role="form" aria-label="Send a message">
+        {/* Input in sidebar */}
+        <form className="sidebar-composer" onSubmit={handleSubmit} role="form" aria-label="Send a message">
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about procedures, troubleshooting, or policies..."
+            placeholder="Ask a question..."
             aria-label="Issue description or question"
             disabled={isLoading}
           />
@@ -476,6 +401,90 @@ export default function App() {
             {isLoading ? '…' : '↑'}
           </button>
         </form>
+      </aside>
+
+      {/* Main content area */}
+      <div className="main-area">
+        {/* Toggle button - always visible */}
+        {!sidebarOpen && (
+          <button
+            className="sidebar-toggle-btn floating"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
+            title="Open chat"
+          >
+            💬
+          </button>
+        )}
+
+        <div className="main-content-wrapper">
+          <div className="welcome-section">
+            <h1 className="main-title">AssistFlow</h1>
+            <p className="main-subtitle">AI-Powered Workplace Support</p>
+            
+            <div className="features-grid">
+              <div className="feature-card">
+                <div className="feature-icon">🤖</div>
+                <h3>AI Assistant</h3>
+                <p>Get instant answers powered by Gemini AI</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">📚</div>
+                <h3>Knowledge Base</h3>
+                <p>Access SOPs and troubleshooting guides</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">⚡</div>
+                <h3>Offline Mode</h3>
+                <p>39 protocols available without connection</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">🎯</div>
+                <h3>Quick Solutions</h3>
+                <p>Step-by-step procedures and fixes</p>
+              </div>
+            </div>
+
+            <div className="quick-start">
+              <h3>Quick Topics</h3>
+              <div className="topic-grid">
+                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("How do I reset my CRM password?"); }}>
+                  🔑 CRM Password Reset
+                </button>
+                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("System is running slow"); }}>
+                  ⚡ System Slowness
+                </button>
+                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("Call quality issues"); }}>
+                  📞 Call Quality
+                </button>
+                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("VPN disconnected"); }}>
+                  🌐 VPN Issues
+                </button>
+                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("How do I escalate a ticket?"); }}>
+                  📋 Ticket Escalation
+                </button>
+                <button className="topic-button" onClick={() => { setSidebarOpen(true); sendMessage("Customer identity verification"); }}>
+                  🆔 Identity Verification
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <button
+                className="setting-button"
+                onClick={() => setDarkMode(d => !d)}
+              >
+                {darkMode ? '☀️' : '🌙'} {darkMode ? 'Light Mode' : 'Dark Mode'}
+              </button>
+              <button
+                className="setting-button"
+                onClick={() => setMessages([WELCOME_MESSAGE])}
+              >
+                🗑️ Clear Chat
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
