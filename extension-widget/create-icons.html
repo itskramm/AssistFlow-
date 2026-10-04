@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AssistFlow Icon Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      text-align: center;
+    }
+    canvas {
+      border: 2px solid #ddd;
+      margin: 20px 10px;
+      border-radius: 8px;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .instructions {
+      background: #f0f0f0;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>🤖 AssistFlow Icon Generator</h1>
+  <p>Generate extension icons for Chrome Web Store</p>
+
+  <div>
+    <canvas id="icon16" width="16" height="16"></canvas>
+    <canvas id="icon48" width="48" height="48"></canvas>
+    <canvas id="icon128" width="128" height="128"></canvas>
+  </div>
+
+  <div>
+    <button onclick="generateIcons()">Generate Icons</button>
+    <button onclick="downloadIcon('icon16')">Download 16x16</button>
+    <button onclick="downloadIcon('icon48')">Download 48x48</button>
+    <button onclick="downloadIcon('icon128')">Download 128x128</button>
+  </div>
+
+  <div class="instructions">
+    <h3>Instructions:</h3>
+    <ol>
+      <li>Click "Generate Icons" to create the icons</li>
+      <li>Click each "Download" button to save the icons</li>
+      <li>Save them as: <code>icon16.png</code>, <code>icon48.png</code>, <code>icon128.png</code></li>
+      <li>Move the files to the <code>extension-widget/icons/</code> folder</li>
+      <li>Reload the extension in Chrome</li>
+    </ol>
+  </div>
+
+  <script>
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      
+      // Create gradient background
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#667eea');
+      gradient.addColorStop(1, '#764ba2');
+      
+      // Draw rounded rectangle
+      const radius = size * 0.2;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fill();
+      
+      // Draw chat bubble emoji
+      ctx.font = `${size * 0.6}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('💬', size / 2, size / 2);
+    }
+
+    function generateIcons() {
+      drawIcon(document.getElementById('icon16'), 16);
+      drawIcon(document.getElementById('icon48'), 48);
+      drawIcon(document.getElementById('icon128'), 128);
+      alert('Icons generated! Click download buttons to save them.');
+    }
+
+    function downloadIcon(canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = `${canvasId}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Auto-generate on load
+    window.onload = function() {
+      generateIcons();
+    };
+  </script>
+</body>
+</html>
