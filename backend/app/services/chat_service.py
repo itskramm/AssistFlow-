@@ -329,7 +329,10 @@ class ChatService:
         Path(CHROMA_DB_PATH).mkdir(parents=True, exist_ok=True)
         self._chroma = chromadb.PersistentClient(
             path=CHROMA_DB_PATH,
-            settings=Settings(anonymized_telemetry=False),
+            settings=Settings(
+                anonymized_telemetry=False,
+                chroma_product_telemetry_impl="app.core.chroma_telemetry.NoOpTelemetry",
+            ),
         )
 
         logger.info("ChatService initialised (Gemini 3.1 Flash Lite + ChromaDB ready)")

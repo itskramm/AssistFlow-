@@ -114,7 +114,10 @@ def ingest() -> None:
     Path(CHROMA_DB_PATH).mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(
         path=CHROMA_DB_PATH,
-        settings=Settings(anonymized_telemetry=False),
+        settings=Settings(
+            anonymized_telemetry=False,
+            chroma_product_telemetry_impl="app.core.chroma_telemetry.NoOpTelemetry",
+        ),
     )
 
     # Drop and recreate collection for a clean ingest
