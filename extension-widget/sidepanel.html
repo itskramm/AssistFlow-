@@ -222,7 +222,6 @@
       border-radius: 14px;
       line-height: 1.55;
       word-break: break-word;
-      white-space: pre-line;
     }
 
     .message-row.user .message-bubble {
@@ -243,6 +242,30 @@
       border-color: var(--error-text);
       color: var(--error-text);
       font-size: 0.82rem;
+    }
+
+    .assistant-content {
+      min-width: 0;
+    }
+
+    .assistant-paragraph {
+      margin: 0;
+    }
+
+    .assistant-paragraph + .assistant-paragraph {
+      margin-top: 8px;
+    }
+
+    .steps-list {
+      margin: 0;
+      padding-left: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .steps-list li {
+      padding-left: 3px;
     }
 
     .source-badge {

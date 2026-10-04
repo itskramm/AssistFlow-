@@ -69,6 +69,56 @@ function scrollToBottom() {
   });
 }
 
+function appendInlineText(parent, text) {
+  const pattern = /\*\*(.*?)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    }
+
+    const strong = document.createElement('strong');
+    strong.textContent = match[1];
+    parent.appendChild(strong);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+function appendAssistantContent(parent, content) {
+  const lines = content.split('\n').map(line => line.trim()).filter(Boolean);
+  const stepPattern = /^(\d+[.):]\s+|step\s+\d+[.:]\s*)/i;
+  let stepList = null;
+
+  for (const line of lines) {
+    const stepMatch = line.match(stepPattern);
+
+    if (stepMatch) {
+      if (!stepList) {
+        stepList = document.createElement('ol');
+        stepList.className = 'steps-list';
+        parent.appendChild(stepList);
+      }
+
+      const item = document.createElement('li');
+      appendInlineText(item, line.replace(stepPattern, '').trim());
+      stepList.appendChild(item);
+      continue;
+    }
+
+    stepList = null;
+    const paragraph = document.createElement('p');
+    paragraph.className = 'assistant-paragraph';
+    appendInlineText(paragraph, line);
+    parent.appendChild(paragraph);
+  }
+}
+
 function addMessage(type, content, source) {
   const row = document.createElement('div');
   row.className = `message-row ${type}`;
@@ -83,7 +133,14 @@ function addMessage(type, content, source) {
 
   const bubble = document.createElement('div');
   bubble.className = `message-bubble${type === 'system' ? ' system' : ''}`;
-  bubble.textContent = content;
+  if (type === 'assistant') {
+    const contentElement = document.createElement('div');
+    contentElement.className = 'assistant-content';
+    appendAssistantContent(contentElement, content);
+    bubble.appendChild(contentElement);
+  } else {
+    bubble.textContent = content;
+  }
 
   if (source) {
     const badge = document.createElement('span');
