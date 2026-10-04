@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">
+  <!-- Circle background -->
+  <circle cx="28" cy="28" r="28" fill="#10a37f"/>
+  <!-- Chat bubble shape -->
+  <path d="M14 18 C14 15.8 15.8 14 18 14 L38 14 C40.2 14 42 15.8 42 18 L42 30 C42 32.2 40.2 34 38 34 L30 34 L24 42 L24 34 L18 34 C15.8 34 14 32.2 14 30 Z"
+    fill="white"/>
+  <!-- Dots inside bubble -->
+  <circle cx="22" cy="24" r="2.2" fill="#10a37f"/>
+  <circle cx="28" cy="24" r="2.2" fill="#10a37f"/>
+  <circle cx="34" cy="24" r="2.2" fill="#10a37f"/>
+</svg>

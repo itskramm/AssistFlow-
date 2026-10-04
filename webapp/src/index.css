@@ -415,6 +415,55 @@ html, body, #root {
   background: var(--bg-app);
 }
 
+/* ── Floating chat button — fixed bottom-right, always on top ────────── */
+.floating-chat-bubble {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s,
+              opacity 0.2s;
+}
+
+.floating-chat-bubble:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+.floating-chat-bubble:active {
+  transform: scale(0.95);
+}
+
+.floating-chat-bubble.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.75);
+}
+
+.bubble-logo-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.bubble-icon  { display: none; }
+.bubble-pulse { display: none; }
+
 .main-content-wrapper {
   flex: 1;
   display: flex;
