@@ -34,14 +34,14 @@ In the browser:
 
 ---
 
-## Step 3: Use the Side Panel! (30 seconds)
+## Step 3: Use the Floating Button (30 seconds)
 
-1. Look for the **AssistFlow icon** in your Chrome toolbar
-2. **Click the icon** → side panel opens on the right
+1. Open a normal website such as GitHub or Google.
+2. Click the SmartOpsSupportHub button in the bottom-right corner.
 3. Type: **"Hello, can you help me?"**
 4. Press **Enter** or click **Send**
-5. Get AI response (~1-2 seconds)
-6. Panel stays open as you browse!
+5. Get an AI response without leaving the page.
+6. Use the extension toolbar icon if you want the native panel that persists across tabs.
 
 ✅ It works!
 
@@ -55,13 +55,11 @@ In the browser:
 - ❌ Z-index issues
 - ❌ Performance impact
 
-### New Version: Native Side Panel
-- ✅ Native Chrome UI (like DevTools)
-- ✅ No page injection or conflicts
-- ✅ Better performance
-- ✅ Works on ALL pages (even chrome://)
-- ✅ Persistent across tabs
-- ✅ User can resize
+### New Version: Native Side Panel + Floating Button
+- ✅ Floating launcher on normal websites
+- ✅ Native Chrome panel available from the toolbar
+- ✅ Native panel persists across tabs
+- ⚠️ Chrome-restricted pages cannot run the floating launcher
 
 ---
 

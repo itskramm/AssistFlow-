@@ -1,12 +1,13 @@
 # AssistFlow Chrome Extension
 
-A browser extension that adds the AssistFlow AI assistant as a **native Chrome side panel** - just like Chrome DevTools, but for workplace support!
+A browser extension that adds SmartOpsSupportHub as a **native Chrome side panel** and a floating launcher on normal webpages.
 
 ## Features
 
 - 📌 **Native Side Panel** - Built-in Chrome UI, not injected content
+- 💬 **Floating Page Button** - Quick access from normal `http(s)` webpages
 - 🎨 **Beautiful Interface** - Clean, modern chat design
-- ⚡ **Always Available** - Click extension icon to open side panel
+- ⚡ **Always Available** - Click the page button or extension icon
 - 🚀 **Fast & Smooth** - No page impact, runs separately
 - 🔒 **Privacy Focused** - Only communicates with AssistFlow backend
 - 💬 **Full Chat Experience** - Same features as the web app
@@ -38,11 +39,11 @@ Save them to the `icons/` folder.
 
 ## How to Use
 
-1. **After installation**, click the **AssistFlow icon** in your Chrome toolbar
-2. The **side panel** opens on the right side of your browser
+1. On a normal website, click the SmartOpsSupportHub button in the bottom-right corner.
+2. The embedded chat panel opens without leaving the page.
 3. **Start chatting!** Ask questions about workplace procedures, troubleshooting, etc.
-4. The side panel stays open across tabs - works alongside your browsing
-5. Click the icon again or close the panel to hide it
+4. For Chrome's persistent native panel, click the extension icon in the toolbar.
+5. Use the close button or press Escape to close the page panel.
 
 ## What is Chrome Side Panel?
 
@@ -65,7 +66,9 @@ It's a **native Chrome feature** that:
 extension-widget/
 ├── manifest.json         # Extension configuration (v3 with side panel)
 ├── background.js         # Service worker for side panel
-├── sidepanel.html       # Side panel UI
+├── content.js            # Injects the floating page button
+├── widget.css            # Floating button and embedded panel styles
+├── sidepanel.html        # Side panel UI
 ├── sidepanel.js         # Side panel logic & API calls
 ├── create-icons.html    # Icon generator tool
 ├── icons/
@@ -84,14 +87,11 @@ The extension uses Chrome's **Side Panel API** (introduced in Chrome 114):
 - Handled by background service worker
 - Runs independently from web pages
 
-### Benefits Over Content Script Injection
-- ✅ No DOM injection or conflicts
-- ✅ No z-index battles with websites
-- ✅ Native Chrome UI integration
-- ✅ Better performance (separate context)
-- ✅ Persistent across tabs
-- ✅ User can resize the panel
-- ✅ Works on restricted pages (chrome://, etc.)
+### Page Button Limitations
+- ✅ Works on normal `http(s)` webpages
+- ✅ Uses the same chat UI and backend as the native side panel
+- ⚠️ Chrome blocks content scripts on `chrome://` pages, the Chrome Web Store, extension pages, and some protected sites
+- ⚠️ The native side panel remains the option that persists across tabs
 
 ### Backend Communication
 All chat requests go to:

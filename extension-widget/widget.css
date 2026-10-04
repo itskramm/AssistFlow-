@@ -1,0 +1,102 @@
+#smartops-widget-root,
+#smartops-widget-root * {
+  box-sizing: border-box;
+}
+
+#smartops-widget-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483646;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #10a37f;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+#smartops-widget-button:hover {
+  transform: scale(1.08);
+}
+
+#smartops-widget-button:focus-visible,
+#smartops-widget-close:focus-visible {
+  outline: 3px solid #667eea;
+  outline-offset: 3px;
+}
+
+#smartops-widget-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+#smartops-widget-button.smartops-widget-button-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#smartops-widget-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  background: rgba(0, 0, 0, 0.34);
+}
+
+#smartops-widget-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 2147483647;
+  width: min(400px, 100vw);
+  height: 100vh;
+  background: #fff;
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.2);
+  transform: translateX(100%);
+  transition: transform 200ms ease;
+}
+
+#smartops-widget-panel.smartops-widget-panel-open {
+  transform: translateX(0);
+}
+
+#smartops-widget-panel iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+#smartops-widget-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.12);
+  color: #fff;
+  font: 24px/30px Arial, sans-serif;
+  cursor: pointer;
+}
+
+#smartops-widget-close:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+@media (max-width: 600px) {
+  #smartops-widget-button {
+    right: 16px;
+    bottom: 16px;
+    width: 56px;
+    height: 56px;
+  }
+}

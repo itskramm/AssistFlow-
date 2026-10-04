@@ -1,119 +1,191 @@
-// SmartOpsSupportHub Side Panel Logic
+// SmartOpsSupportHub side panel and embedded widget logic
 
 const BACKEND_URL = 'https://assistflow-backend-ctbq.onrender.com';
+const FETCH_TIMEOUT_MS = 15000;
 
 const chatContainer = document.getElementById('chatContainer');
+const faqList = document.getElementById('faqList');
 const messageForm = document.getElementById('messageForm');
 const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
 const statusBadge = document.getElementById('statusBadge');
+const newChatButton = document.getElementById('newChatButton');
+const themeButton = document.getElementById('themeButton');
 
-let conversationHistory = [];
 let isProcessing = false;
+let isOffline = false;
+let conversationHistory = [];
 
-// Quick topic buttons
-document.querySelectorAll('.topic-button').forEach(button => {
-  button.addEventListener('click', () => {
-    const topic = button.dataset.topic;
-    messageInput.value = topic;
-    sendMessage(topic);
+function getStoredTheme() {
+  try {
+    return localStorage.getItem('smartops-dark') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setDarkMode(enabled) {
+  document.documentElement.classList.toggle('dark', enabled);
+  themeButton.textContent = enabled ? '☀' : '☾';
+  try {
+    localStorage.setItem('smartops-dark', String(enabled));
+  } catch {
+    // Theme preference is optional.
+  }
+}
+
+function updateStatus(online) {
+  statusBadge.textContent = online ? 'Online' : 'Offline';
+  statusBadge.className = `status-pill ${online ? 'online' : 'offline'}`;
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
   });
-});
+}
 
-// Form submission
-messageForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const message = messageInput.value.trim();
-  if (message) {
-    sendMessage(message);
-  }
-});
+function addMessage(type, content, source) {
+  const row = document.createElement('div');
+  row.className = `message-row ${type}`;
 
-// Send message on Enter
-messageInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !isProcessing) {
-    e.preventDefault();
-    const message = messageInput.value.trim();
-    if (message) {
-      sendMessage(message);
-    }
+  if (type === 'assistant') {
+    const avatar = document.createElement('img');
+    avatar.className = 'message-avatar';
+    avatar.src = 'icons/icon48.png';
+    avatar.alt = '';
+    row.appendChild(avatar);
   }
-});
+
+  const bubble = document.createElement('div');
+  bubble.className = `message-bubble${type === 'system' ? ' system' : ''}`;
+  bubble.textContent = content;
+
+  if (source) {
+    const badge = document.createElement('span');
+    badge.className = 'source-badge';
+    badge.textContent = getSourceLabel(source);
+    bubble.appendChild(document.createTextNode(' '));
+    bubble.appendChild(badge);
+  }
+
+  row.appendChild(bubble);
+  chatContainer.appendChild(row);
+  scrollToBottom();
+  return row;
+}
+
+function showTypingIndicator() {
+  const row = document.createElement('div');
+  row.className = 'message-row assistant';
+
+  const avatar = document.createElement('img');
+  avatar.className = 'message-avatar';
+  avatar.src = 'icons/icon48.png';
+  avatar.alt = '';
+  row.appendChild(avatar);
+
+  const indicator = document.createElement('div');
+  indicator.className = 'typing-indicator';
+  indicator.innerHTML = '<span></span><span></span><span></span>';
+  row.appendChild(indicator);
+
+  chatContainer.appendChild(row);
+  scrollToBottom();
+  return row;
+}
+
+function getSourceLabel(source) {
+  const labels = {
+    rag: 'AI · SOP',
+    'offline-cache': 'Offline FAQ',
+    fallback: 'No connection'
+  };
+  return labels[source] || source;
+}
+
+function renderFaqTopics() {
+  faqList.replaceChildren();
+  FAQ.forEach((entry) => {
+    const button = document.createElement('button');
+    button.className = 'faq-button';
+    button.type = 'button';
+    button.textContent = entry.label;
+    button.addEventListener('click', () => sendMessage(entry.query));
+    faqList.appendChild(button);
+  });
+}
+
+function resetChat() {
+  conversationHistory = [];
+  isOffline = false;
+  chatContainer.querySelectorAll('.message-row').forEach((row) => row.remove());
+  renderFaqTopics();
+  updateStatus(true);
+  messageInput.value = '';
+  messageInput.focus();
+}
+
+async function getAssistantResponse(message) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        conversation_history: conversationHistory
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 async function sendMessage(message) {
-  if (!message || isProcessing) return;
+  const trimmed = message.trim();
+  if (!trimmed || isProcessing) return;
 
   isProcessing = true;
   messageInput.disabled = true;
   sendButton.disabled = true;
   messageInput.value = '';
 
-  // Add user message
-  addMessage('user', message);
-
-  // Add to history
-  conversationHistory.push({
-    role: 'user',
-    content: message
-  });
-
-  // Show typing indicator
-  const typingIndicator = showTypingIndicator();
+  addMessage('user', trimmed);
+  conversationHistory.push({ role: 'user', content: trimmed });
+  const typing = showTypingIndicator();
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    if (isOffline) throw new Error('offline');
 
-    const response = await fetch(`${BACKEND_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: message,
-        conversation_history: conversationHistory
-      }),
-      signal: controller.signal
-    });
+    const data = await getAssistantResponse(trimmed);
+    typing.remove();
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Remove typing indicator
-    typingIndicator.remove();
-
-    // Add assistant response
-    addMessage('assistant', data.response || data.reply || 'No response from assistant');
-
-    // Update conversation history
-    conversationHistory.push({
-      role: 'assistant',
-      content: data.response || data.reply
-    });
-
-    // Show source if available
-    if (data.source) {
-      const sourceText = getSourceLabel(data.source);
-      addSourceBadge(sourceText);
-    }
-
-    // Update status
-    updateStatus('online');
-
+    const answer = data.reply || data.response || 'The system returned no guidance.';
+    const source = data.source || 'rag';
+    addMessage('assistant', answer, source);
+    conversationHistory.push({ role: 'assistant', content: answer });
+    updateStatus(true);
   } catch (error) {
-    console.error('Chat error:', error);
-    typingIndicator.remove();
+    typing.remove();
+    const { answer, matched } = searchFaq(trimmed);
 
-    if (error.name === 'AbortError') {
-      addMessage('system', '⚠️ Request timed out. Please try again.');
+    isOffline = true;
+    updateStatus(false);
+
+    if (matched) {
+      addMessage('assistant', answer, 'offline-cache');
+      conversationHistory.push({ role: 'assistant', content: answer });
+    } else if (error.name === 'AbortError') {
+      addMessage('system', 'Request timed out. Try again or choose a topic from the FAQ.');
     } else {
-      addMessage('system', '⚠️ Connection error. The assistant is currently offline.');
-      updateStatus('offline');
+      addMessage('system', 'The assistant is offline. Choose a matching topic from the FAQ below.');
     }
   } finally {
     isProcessing = false;
@@ -123,99 +195,38 @@ async function sendMessage(message) {
   }
 }
 
-function addMessage(type, content) {
-  const messageRow = document.createElement('div');
-  messageRow.className = `message-row ${type}`;
+messageForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  sendMessage(messageInput.value);
+});
 
-  const bubble = document.createElement('div');
-  bubble.className = type === 'system' ? 'message-bubble system' : 'message-bubble';
-  bubble.textContent = content;
-
-  messageRow.appendChild(bubble);
-  chatContainer.appendChild(messageRow);
-
-  // Smooth scroll
-  requestAnimationFrame(() => {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  });
-}
-
-function showTypingIndicator() {
-  const messageRow = document.createElement('div');
-  messageRow.className = 'message-row assistant';
-
-  const indicator = document.createElement('div');
-  indicator.className = 'typing-indicator';
-  indicator.innerHTML = '<span></span><span></span><span></span>';
-
-  messageRow.appendChild(indicator);
-  chatContainer.appendChild(messageRow);
-
-  requestAnimationFrame(() => {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  });
-
-  return messageRow;
-}
-
-function addSourceBadge(text) {
-  const lastAssistantRow = Array.from(chatContainer.querySelectorAll('.message-row.assistant'))
-    .filter(row => !row.querySelector('.typing-indicator'))
-    .pop();
-
-  if (lastAssistantRow) {
-    const bubble = lastAssistantRow.querySelector('.message-bubble');
-    if (bubble) {
-      const badge = document.createElement('div');
-      badge.className = 'source-badge';
-      badge.textContent = text;
-      bubble.appendChild(badge);
-    }
+messageInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    messageForm.requestSubmit();
   }
-}
+});
 
-function getSourceLabel(source) {
-  const labels = {
-    'rag': '📚 AI · SOP',
-    'offline-cache': '📦 Offline cache',
-    'fallback': '⚠️ No connection'
-  };
-  return labels[source] || source;
-}
+newChatButton.addEventListener('click', resetChat);
+themeButton.addEventListener('click', () => {
+  setDarkMode(!document.documentElement.classList.contains('dark'));
+});
 
-function updateStatus(status) {
-  if (status === 'online') {
-    statusBadge.textContent = '✅ Online';
-    statusBadge.className = 'status-badge online';
-  } else {
-    statusBadge.textContent = '⚠️ Offline';
-    statusBadge.className = 'status-badge offline';
-  }
-}
-
-// Check backend health on load
 async function checkBackendHealth() {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch(`${BACKEND_URL}/api/health`, {
-      signal: controller.signal
-    });
-
+    const response = await fetch(`${BACKEND_URL}/api/health`, { signal: controller.signal });
     clearTimeout(timeoutId);
-
-    if (response.ok) {
-      updateStatus('online');
-      console.log('✅ Backend connected');
-    } else {
-      updateStatus('offline');
-    }
-  } catch (error) {
-    console.error('Backend health check failed:', error);
-    updateStatus('offline');
+    isOffline = !response.ok;
+    updateStatus(response.ok);
+  } catch {
+    isOffline = true;
+    updateStatus(false);
   }
 }
 
-// Check health on load (debounced)
-setTimeout(checkBackendHealth, 500);
+setDarkMode(getStoredTheme());
+renderFaqTopics();
+setTimeout(checkBackendHealth, 300);
+messageInput.focus();
