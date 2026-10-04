@@ -85,7 +85,7 @@ ChromaDB   Gemini Flash
 - **Clickable topic list** — when no FAQ match is found offline, all topics shown as one-tap buttons
 - **Auto-recovery** — polls backend silently while offline and restores online mode automatically
 - **Thumbs up / down feedback** — per response, logged to backend for continuous improvement
-- **Per-user prompt history** — signed-in users can reload their saved prompts, responses, sources, and ratings
+- **Per-user conversation history** — signed-in users can reopen saved chats with their prompts, responses, sources, and ratings
 - **Dark mode** — with system-preference detection and `localStorage` persistence
 - **Latency tracking** — every backend request logged with response time in ms
 - **Robust offline detection** — 5s timeout on first failure, then instant FAQ responses with zero network calls
@@ -307,10 +307,10 @@ FASTAPI_PORT=8000
 LOG_LEVEL=INFO
 ```
 
-For login, profile details, and per-user prompt history, configure Supabase in
+For login, profile details, and per-user conversation history, configure Supabase in
 `webapp/.env.local` using `webapp/.env.example`, then run `supabase/schema.sql`
 in the Supabase SQL Editor. Supabase Row Level Security ensures each user can
-only read and update their own profile and prompt history.
+only read and update their own profile and conversation history.
 
 ---
 

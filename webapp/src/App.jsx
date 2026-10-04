@@ -550,8 +550,8 @@ function HistoryPanel({ items, isOpen, selectedId, onSelect, onNewChat }) {
     <aside className={`history-panel ${isOpen ? 'history-open' : 'history-closed'}`}>
       <div className="history-header">
         <div>
-          <p className="history-title">Prompt history</p>
-          <span className="history-subtitle">Your saved conversations</span>
+          <p className="history-title">Conversation history</p>
+          <span className="history-subtitle">Your saved chats</span>
         </div>
         <button
           className="history-new-btn"
@@ -576,9 +576,9 @@ function HistoryPanel({ items, isOpen, selectedId, onSelect, onNewChat }) {
               className={`history-item ${selectedId === item.id ? 'history-item-active' : ''}`}
               type="button"
               onClick={() => onSelect(item.id)}
-              title={item.prompt}
+              title={item.title}
             >
-              <span className="history-item-prompt">{item.prompt}</span>
+              <span className="history-item-prompt">{item.title}</span>
               <time dateTime={item.createdAt}>{formatHistoryDate(item.createdAt)}</time>
             </button>
           ))}
@@ -608,6 +608,8 @@ export default function App() {
   const [sideLoading, setSideLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [input,      setInput]      = useState('');
   const [status,     setStatus]     = useState('Online');
@@ -697,40 +699,72 @@ export default function App() {
       ]))
   ), []);
 
-  // Restore only this user's saved prompts after authentication.
+  const loadConversation = useCallback(async (conversationId, shouldScroll = false) => {
+    if (!supabase || !session?.user || !conversationId) return;
+
+    const { data, error } = await supabase
+      .from('prompt_history')
+      .select('id, prompt, response, source, latency_ms, channel, rating, created_at')
+      .eq('user_id', session.user.id)
+      .eq('conversation_id', conversationId)
+      .eq('channel', 'main')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Unable to load conversation:', error);
+      return;
+    }
+
+    setMessages(promptHistoryRowsToMessages(data || []));
+    setActiveConversationId(conversationId);
+    setSelectedHistoryId(conversationId);
+    setChatMode((data || []).length > 0);
+
+    if (shouldScroll) {
+      requestAnimationFrame(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }));
+    }
+  }, [promptHistoryRowsToMessages, session]);
+
+  // Restore this user's conversation list and most recent conversation.
   useEffect(() => {
     if (!supabase || !session?.user) {
       setMessages([]);
       setSideMessages([]);
       setChatMode(false);
+      setConversations([]);
+      setActiveConversationId(null);
+      setSelectedHistoryId(null);
       return undefined;
     }
 
     let active = true;
     supabase
-      .from('prompt_history')
-      .select('id, prompt, response, source, latency_ms, channel, rating, created_at')
+      .from('prompt_conversations')
+      .select('id, title, channel, created_at, updated_at')
       .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
+      .eq('channel', 'main')
+      .order('updated_at', { ascending: false })
       .limit(PROMPT_HISTORY_LIMIT)
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (!active) return;
         if (error) {
-          console.error('Unable to load prompt history:', error);
+          console.error('Unable to load conversation history:', error);
           return;
         }
 
-        const rows = data || [];
-        const mainRows = rows.filter(row => row.channel === 'main');
-        const sidebarRows = rows.filter(row => row.channel === 'sidebar');
-        setMessages(promptHistoryRowsToMessages(mainRows));
-        setSideMessages(promptHistoryRowsToMessages(sidebarRows));
-        setChatMode(mainRows.length > 0);
-        setSelectedHistoryId(null);
+        const conversationRows = data || [];
+        setConversations(conversationRows);
+        const latestConversation = conversationRows[0];
+        if (latestConversation) {
+          await loadConversation(latestConversation.id);
+        } else {
+          setMessages([]);
+          setChatMode(false);
+        }
       });
 
     return () => { active = false; };
-  }, [promptHistoryRowsToMessages, session]);
+  }, [loadConversation, session]);
 
   const savePromptHistory = useCallback(async ({
     prompt,
@@ -738,6 +772,7 @@ export default function App() {
     source,
     latencyMs,
     channel = 'main',
+    conversationId = null,
   }) => {
     if (!supabase || !session?.user?.id) return null;
 
@@ -746,6 +781,7 @@ export default function App() {
         .from('prompt_history')
         .insert({
           user_id: session.user.id,
+          conversation_id: conversationId,
           prompt,
           response,
           source,
@@ -759,12 +795,55 @@ export default function App() {
         console.error('Unable to save prompt history:', error);
         return null;
       }
+
+      if (conversationId && channel === 'main') {
+        const updatedAt = data.created_at;
+        setConversations(prev => prev.map(conversation => (
+          conversation.id === conversationId
+            ? { ...conversation, updated_at: updatedAt }
+            : conversation
+        )));
+        await supabase
+          .from('prompt_conversations')
+          .update({ updated_at: updatedAt })
+          .eq('id', conversationId)
+          .eq('user_id', session.user.id);
+      }
+
       return data;
     } catch (error) {
       console.error('Unable to save prompt history:', error);
       return null;
     }
   }, [session]);
+
+  const createConversation = useCallback(async (title) => {
+    if (!supabase || !session?.user?.id) return null;
+
+    const { data, error } = await supabase
+      .from('prompt_conversations')
+      .insert({
+        user_id: session.user.id,
+        title: title.slice(0, 80),
+        channel: 'main',
+      })
+      .select('id, title, channel, created_at, updated_at')
+      .single();
+
+    if (error) {
+      console.error('Unable to create conversation:', error);
+      return null;
+    }
+
+    setConversations(prev => [data, ...prev]);
+    setActiveConversationId(data.id);
+    setSelectedHistoryId(data.id);
+    return data.id;
+  }, [session]);
+
+  const ensureConversation = useCallback(async (title) => (
+    activeConversationId || createConversation(title)
+  ), [activeConversationId, createConversation]);
 
   const handleLogout = useCallback(async () => {
     if (supabase) await supabase.auth.signOut();
@@ -824,6 +903,8 @@ export default function App() {
     const trimmed = (text || '').trim();
     if (!trimmed || isLoading) return;
 
+    const conversationId = await ensureConversation(trimmed);
+
     // Switch to chat view on first message
     if (!chatMode) setChatMode(true);
 
@@ -848,6 +929,7 @@ export default function App() {
         prompt: trimmed,
         response: matched ? answer : '',
         source: matched ? 'offline-cache' : 'offline-topics',
+        conversationId,
       });
       if (history) {
         setMessages(prev => prev.map(message => (
@@ -887,6 +969,7 @@ export default function App() {
         response: data.reply || 'The system responded but returned no guidance.',
         source: data.source || 'rag',
         latencyMs: data.latency_ms,
+        conversationId,
       });
       if (history) {
         setMessages(prev => prev.map(message => (
@@ -912,6 +995,7 @@ export default function App() {
         prompt: trimmed,
         response: matched ? answer : '',
         source: matched ? 'offline-cache' : 'offline-topics',
+        conversationId,
       });
       if (history) {
         setMessages(prev => prev.map(message => (
@@ -925,7 +1009,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [chatMode, isLoading, savePromptHistory]);
+  }, [chatMode, ensureConversation, isLoading, savePromptHistory]);
 
   const handleSubmit      = e => { e.preventDefault(); sendMessage(input); };
   const handleRetry       = useCallback(t => { if (t) sendMessage(t); }, [sendMessage]);
@@ -1054,30 +1138,15 @@ export default function App() {
   const newChat = () => {
     setMessages([]);
     setChatMode(false);
+    setActiveConversationId(null);
     setSelectedHistoryId(null);
     setInput('');
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  const historyItems = messages
-    .filter(message => message.sender === 'assistant' && message.historyId)
-    .map(message => ({
-      id: message.historyId,
-      prompt: message.userText,
-      createdAt: message.createdAt,
-    }))
-    .reverse();
-
-  const selectHistory = useCallback((historyId) => {
-    setChatMode(true);
-    setSelectedHistoryId(historyId);
-    requestAnimationFrame(() => {
-      document.getElementById(`history-${historyId}`)?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-    });
-  }, []);
+  const selectHistory = useCallback((conversationId) => {
+    loadConversation(conversationId, true);
+  }, [loadConversation]);
 
   if (authLoading) {
     return <main className="login-page"><p className="login-loading">Loading…</p></main>;
@@ -1190,7 +1259,11 @@ export default function App() {
       {/* ── Main ── */}
       <div className="workspace-shell">
         <HistoryPanel
-          items={historyItems}
+          items={conversations.map(conversation => ({
+            id: conversation.id,
+            title: conversation.title,
+            createdAt: conversation.updated_at,
+          }))}
           isOpen={historyOpen}
           selectedId={selectedHistoryId}
           onSelect={selectHistory}
