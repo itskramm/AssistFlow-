@@ -12,6 +12,9 @@ const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow
 const FETCH_TIMEOUT_MS = 5000;
 const HEALTH_POLL_MS   = 30000;
 
+// Debug: Log the backend URL being used
+console.log('🔗 AssistFlow Backend URL:', BACKEND_URL);
+
 const WELCOME_MESSAGE = {
   id: 'welcome',
   sender: 'assistant',
