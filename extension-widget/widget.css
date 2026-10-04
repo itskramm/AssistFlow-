@@ -1,4 +1,4 @@
-/* AssistFlow Widget Styles */
+/* AssistFlow Widget Styles - Optimized for performance */
 
 #assistflow-floating-btn {
   position: fixed;
@@ -15,20 +15,21 @@
   cursor: pointer;
   z-index: 2147483646;
   box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  animation: assistflow-float 3s ease-in-out infinite;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  /* Remove constant animation to reduce CPU usage */
 }
 
 #assistflow-floating-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
   box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
-  animation: none;
 }
 
-@keyframes assistflow-float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+#assistflow-floating-btn:active {
+  transform: scale(0.95);
 }
+
+/* Remove floating animation - causes constant repaints */
 
 #assistflow-backdrop {
   position: fixed;
@@ -38,17 +39,20 @@
   height: 100%;
   background: rgba(0, 0, 0, 0.5);
   z-index: 2147483647;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
 }
 
 .assistflow-backdrop-hidden {
   opacity: 0;
   pointer-events: none;
+  visibility: hidden; /* Prevent rendering when hidden */
 }
 
 .assistflow-backdrop-visible {
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
 }
 
 #assistflow-sidebar {
@@ -60,15 +64,18 @@
   background: white;
   z-index: 2147483648;
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s ease;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
 }
 
 #assistflow-sidebar.assistflow-closed {
   transform: translateX(100%);
+  visibility: hidden; /* Prevent interaction when closed */
 }
 
 #assistflow-sidebar.assistflow-open {
   transform: translateX(0);
+  visibility: visible;
 }
 
 #assistflow-iframe {

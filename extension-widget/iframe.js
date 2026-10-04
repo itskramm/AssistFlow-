@@ -1,4 +1,4 @@
-// AssistFlow Chat Interface Logic
+// AssistFlow Chat Interface Logic (Optimized)
 
 const BACKEND_URL = 'https://assistflow-backend-ctbq.onrender.com';
 
@@ -8,6 +8,7 @@ const sendBtn = document.getElementById('sendBtn');
 const closeBtn = document.getElementById('closeBtn');
 
 let conversationHistory = [];
+let isProcessing = false;
 
 // Close sidebar
 closeBtn.addEventListener('click', () => {
@@ -16,7 +17,7 @@ closeBtn.addEventListener('click', () => {
 
 // Send message on Enter key
 messageInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
+  if (e.key === 'Enter' && !e.shiftKey && !isProcessing) {
     e.preventDefault();
     sendMessage();
   }
@@ -27,8 +28,11 @@ sendBtn.addEventListener('click', sendMessage);
 
 async function sendMessage() {
   const message = messageInput.value.trim();
-  if (!message) return;
+  if (!message || isProcessing) return;
 
+  // Prevent multiple submissions
+  isProcessing = true;
+  
   // Disable input
   messageInput.disabled = true;
   sendBtn.disabled = true;
@@ -47,6 +51,9 @@ async function sendMessage() {
   const typingIndicator = showTypingIndicator();
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
     const response = await fetch(`${BACKEND_URL}/api/chat`, {
       method: 'POST',
       headers: {
@@ -55,8 +62,11 @@ async function sendMessage() {
       body: JSON.stringify({
         message: message,
         conversation_history: conversationHistory
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -85,9 +95,15 @@ async function sendMessage() {
   } catch (error) {
     console.error('Chat error:', error);
     typingIndicator.remove();
-    addMessage('system', '⚠️ Connection error. The assistant is currently offline. Please try again later.');
+    
+    if (error.name === 'AbortError') {
+      addMessage('system', '⚠️ Request timed out. Please try again.');
+    } else {
+      addMessage('system', '⚠️ Connection error. The assistant is currently offline. Please try again later.');
+    }
   } finally {
     // Re-enable input
+    isProcessing = false;
     messageInput.disabled = false;
     sendBtn.disabled = false;
     messageInput.focus();
@@ -100,8 +116,10 @@ function addMessage(type, content) {
   messageDiv.textContent = content;
   messagesContainer.appendChild(messageDiv);
   
-  // Scroll to bottom
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  // Use requestAnimationFrame for smoother scrolling
+  requestAnimationFrame(() => {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  });
 }
 
 function showTypingIndicator() {
@@ -109,16 +127,32 @@ function showTypingIndicator() {
   indicator.className = 'typing-indicator';
   indicator.innerHTML = '<span></span><span></span><span></span>';
   messagesContainer.appendChild(indicator);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  
+  requestAnimationFrame(() => {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  });
+  
   return indicator;
 }
 
-// Check backend health on load
+// Check backend health on load (with caching)
+let healthCheckDone = false;
 async function checkBackendHealth() {
+  if (healthCheckDone) return;
+  
   try {
-    const response = await fetch(`${BACKEND_URL}/api/health`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+    
+    const response = await fetch(`${BACKEND_URL}/api/health`, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
     if (response.ok) {
       console.log('✅ Backend connected');
+      healthCheckDone = true;
     } else {
       addMessage('system', '⚠️ Backend connection issue detected');
     }
@@ -128,4 +162,11 @@ async function checkBackendHealth() {
   }
 }
 
-checkBackendHealth();
+// Debounced health check
+let healthCheckTimer;
+function scheduleHealthCheck() {
+  clearTimeout(healthCheckTimer);
+  healthCheckTimer = setTimeout(checkBackendHealth, 500);
+}
+
+scheduleHealthCheck();
