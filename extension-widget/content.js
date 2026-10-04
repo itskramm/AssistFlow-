@@ -32,7 +32,7 @@
       >×</button>
       <iframe
         title="SmartOpsSupportHub"
-        src="${chrome.runtime.getURL('sidepanel.html')}?embedded=1"
+        loading="lazy"
         allow="clipboard-write"
       ></iframe>
     </section>
@@ -53,8 +53,14 @@
   const close = root.querySelector('#smartops-widget-close');
   const backdrop = root.querySelector('#smartops-widget-backdrop');
   const panel = root.querySelector('#smartops-widget-panel');
+  const iframe = root.querySelector('iframe');
+  let iframeLoaded = false;
 
   function setOpen(open) {
+    if (open && !iframeLoaded) {
+      iframe.src = `${chrome.runtime.getURL('sidepanel.html')}?embedded=1`;
+      iframeLoaded = true;
+    }
     panel.classList.toggle('smartops-widget-panel-open', open);
     button.classList.toggle('smartops-widget-button-hidden', open);
     backdrop.hidden = !open;

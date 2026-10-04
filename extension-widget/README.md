@@ -141,12 +141,11 @@ To modify the extension:
 
 ## Backend Configuration
 
-The backend URL is hardcoded in:
-- `content.js` (line 9)
-- `iframe.js` (line 3)
-- `popup.js` (line 3)
+The backend URL is hardcoded in `sidepanel.js`. The extension sends only the
+current message to `/api/chat`, matching the web app request path. FAQ answers
+are handled locally by `faq.js` when the backend is unavailable.
 
-To change the backend, update all three files.
+To change the backend, update `BACKEND_URL` in `sidepanel.js`.
 
 ## Future Enhancements
 

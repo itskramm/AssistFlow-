@@ -1,6 +1,25 @@
 # AssistFlow Extension - Performance Optimizations
 
-## Changes Made to Fix Lag Issues
+## Current `extension-widget` optimizations
+
+The current side-panel and floating-launcher implementation is optimized around
+the same request path as the web app:
+
+- The webpage launcher creates the chat iframe only after the user clicks the
+  button, so unopened pages do not parse the chat UI.
+- Chat requests send only the current `message`; the backend does not accept
+  conversation history, so repeated history payloads are avoided.
+- The extension renders at most 80 message rows to prevent long sessions from
+  growing the DOM without limit.
+- Backend health is not probed during startup. The first chat request determines
+  availability, and offline mode retries health in the background every 30
+  seconds.
+- FAQ responses remain local and immediate when the backend is unavailable.
+
+## Historical optimizations from the previous widget implementation
+
+The sections below document the earlier floating-widget implementation and are
+kept for reference. The current behavior is summarized above.
 
 ### 1. CSS Optimizations
 

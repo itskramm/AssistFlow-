@@ -2,6 +2,7 @@
 
 const BACKEND_URL = 'https://assistflow-backend-ctbq.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
+const MAX_RENDERED_MESSAGES = 80;
 
 const chatContainer = document.getElementById('chatContainer');
 const faqList = document.getElementById('faqList');
@@ -14,7 +15,7 @@ const themeButton = document.getElementById('themeButton');
 
 let isProcessing = false;
 let isOffline = false;
-let conversationHistory = [];
+let healthProbeTimer = null;
 
 function getStoredTheme() {
   try {
@@ -37,6 +38,29 @@ function setDarkMode(enabled) {
 function updateStatus(online) {
   statusBadge.textContent = online ? 'Online' : 'Offline';
   statusBadge.className = `status-pill ${online ? 'online' : 'offline'}`;
+}
+
+function scheduleHealthProbe() {
+  clearTimeout(healthProbeTimer);
+  healthProbeTimer = setTimeout(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const response = await fetch(`${BACKEND_URL}/api/health`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        isOffline = false;
+        updateStatus(true);
+        return;
+      }
+    } catch {
+      // Retry on the next scheduled probe.
+    }
+    scheduleHealthProbe();
+  }, 30000);
 }
 
 function scrollToBottom() {
@@ -71,6 +95,10 @@ function addMessage(type, content, source) {
 
   row.appendChild(bubble);
   chatContainer.appendChild(row);
+  const messageRows = chatContainer.querySelectorAll('.message-row');
+  if (messageRows.length > MAX_RENDERED_MESSAGES) {
+    messageRows[0].remove();
+  }
   scrollToBottom();
   return row;
 }
@@ -106,18 +134,20 @@ function getSourceLabel(source) {
 
 function renderFaqTopics() {
   faqList.replaceChildren();
+  const fragment = document.createDocumentFragment();
   FAQ.forEach((entry) => {
     const button = document.createElement('button');
     button.className = 'faq-button';
     button.type = 'button';
     button.textContent = entry.label;
     button.addEventListener('click', () => sendMessage(entry.query));
-    faqList.appendChild(button);
+    fragment.appendChild(button);
   });
+  faqList.appendChild(fragment);
 }
 
 function resetChat() {
-  conversationHistory = [];
+  clearTimeout(healthProbeTimer);
   isOffline = false;
   chatContainer.querySelectorAll('.message-row').forEach((row) => row.remove());
   renderFaqTopics();
@@ -134,10 +164,7 @@ async function getAssistantResponse(message) {
     const response = await fetch(`${BACKEND_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        conversation_history: conversationHistory
-      }),
+      body: JSON.stringify({ message }),
       signal: controller.signal
     });
 
@@ -158,7 +185,6 @@ async function sendMessage(message) {
   messageInput.value = '';
 
   addMessage('user', trimmed);
-  conversationHistory.push({ role: 'user', content: trimmed });
   const typing = showTypingIndicator();
 
   try {
@@ -170,7 +196,6 @@ async function sendMessage(message) {
     const answer = data.reply || data.response || 'The system returned no guidance.';
     const source = data.source || 'rag';
     addMessage('assistant', answer, source);
-    conversationHistory.push({ role: 'assistant', content: answer });
     updateStatus(true);
   } catch (error) {
     typing.remove();
@@ -178,10 +203,10 @@ async function sendMessage(message) {
 
     isOffline = true;
     updateStatus(false);
+    scheduleHealthProbe();
 
     if (matched) {
       addMessage('assistant', answer, 'offline-cache');
-      conversationHistory.push({ role: 'assistant', content: answer });
     } else if (error.name === 'AbortError') {
       addMessage('system', 'Request timed out. Try again or choose a topic from the FAQ.');
     } else {
@@ -212,21 +237,7 @@ themeButton.addEventListener('click', () => {
   setDarkMode(!document.documentElement.classList.contains('dark'));
 });
 
-async function checkBackendHealth() {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(`${BACKEND_URL}/api/health`, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    isOffline = !response.ok;
-    updateStatus(response.ok);
-  } catch {
-    isOffline = true;
-    updateStatus(false);
-  }
-}
-
 setDarkMode(getStoredTheme());
 renderFaqTopics();
-setTimeout(checkBackendHealth, 300);
+updateStatus(true);
 messageInput.focus();
