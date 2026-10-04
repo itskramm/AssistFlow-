@@ -28,10 +28,18 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parents[1]
-KNOWLEDGE_DIR = Path(
-    os.getenv("KNOWLEDGE_DIR", str(BASE_DIR / "data" / "knowledge"))
-)
-CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", str(BASE_DIR / "data" / "chroma"))
+
+
+def configured_path(name: str, default: Path) -> Path:
+    """Resolve relative deployment paths from the backend root."""
+    path = Path(os.getenv(name, str(default)))
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return path.resolve()
+
+
+KNOWLEDGE_DIR = configured_path("KNOWLEDGE_DIR", BASE_DIR / "data" / "knowledge")
+CHROMA_DB_PATH = configured_path("CHROMA_DB_PATH", BASE_DIR / "data" / "chroma")
 COLLECTION_NAME = "assistflow_knowledge"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
