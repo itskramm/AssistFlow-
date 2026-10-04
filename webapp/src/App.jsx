@@ -405,10 +405,12 @@ function LoginScreen() {
                 <label htmlFor="login-phone">Phone number</label>
                 <input
                   id="login-phone"
-                  type="tel"
+                  type="text"
                   value={phone}
                   onChange={event => setPhone(event.target.value)}
+                  inputMode="tel"
                   autoComplete="tel"
+                  spellCheck="false"
                   placeholder="+1 555 123 4567"
                 />
                 <label htmlFor="login-birthday">Birthday</label>
