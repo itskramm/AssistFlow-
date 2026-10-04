@@ -81,7 +81,7 @@ def _check_internet(timeout: float = 3.0) -> bool:
             continue
     return False
 
-SYSTEM_PROMPT = """You are AssistFlow, an AI support assistant for call center agents.
+SYSTEM_PROMPT = """You are SmartOpsSupportHub, an AI support assistant for call center agents.
 Your primary role is to help agents resolve issues quickly. You have two sources of knowledge:
 1. Company-specific context: SOPs, troubleshooting guides, and error logs provided below.
 2. General knowledge: your broader understanding of IT, software, communication, and customer service.

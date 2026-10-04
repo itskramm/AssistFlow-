@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AssistFlow — AI-Assisted Workplace Support System",
+    title="SmartOpsSupportHub — AI-Assisted Workplace Support System",
     version="0.1.0",
     lifespan=lifespan,
 )
