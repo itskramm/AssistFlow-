@@ -14,6 +14,7 @@ import { isSupabaseConfigured, supabase } from './supabaseClient.js';
 const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow-backend-ctbq.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
 const HEALTH_POLL_MS   = 30000;
+const OTP_LENGTH       = 6;
 
 const SUGGESTIONS = [
   { icon: '🔑', label: 'CRM password reset',   query: 'How do I reset my CRM password?' },
@@ -292,8 +293,13 @@ function LoginScreen() {
 
   const verifyEmailOtp = async (event) => {
     event.preventDefault();
-    if (!supabase || !otp.trim()) {
-      setError('Enter the verification code from your email.');
+    const trimmedOtp = otp.trim();
+    if (!supabase || !trimmedOtp) {
+      setError('Enter the 6-digit verification code from your email.');
+      return;
+    }
+    if (!new RegExp(`^\\d{${OTP_LENGTH}}$`).test(trimmedOtp)) {
+      setError('The verification code must contain exactly 6 digits.');
       return;
     }
 
@@ -301,7 +307,7 @@ function LoginScreen() {
     setIsSubmitting(true);
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email: email.trim(),
-      token: otp.trim(),
+      token: trimmedOtp,
       type: 'signup',
     });
     if (verifyError) {
@@ -352,15 +358,19 @@ function LoginScreen() {
           </p>
         ) : awaitingOtp ? (
           <form className="login-form" onSubmit={verifyEmailOtp}>
-            <label htmlFor="login-otp">Email verification code</label>
+            <label htmlFor="login-otp">6-digit email verification code</label>
             <input
               id="login-otp"
               type="text"
               value={otp}
-              onChange={event => setOtp(event.target.value)}
+              onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH))}
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder="Enter the code from your email"
+              pattern={`\\d{${OTP_LENGTH}}`}
+              minLength={OTP_LENGTH}
+              maxLength={OTP_LENGTH}
+              required
+              placeholder="Enter 6 digits"
               autoFocus
             />
             {error && <p className="login-error" role="alert">{error}</p>}

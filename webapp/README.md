@@ -53,9 +53,10 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
 
 The app displays the login/sign-up page until a valid Supabase session exists.
 New users receive an email verification OTP after signup. In the Supabase
-dashboard, configure the Confirm signup email template to include
-`{{ .Token }}` and keep email confirmation enabled. The app verifies the code
-with `supabase.auth.verifyOtp({ type: 'signup' })`.
+dashboard, keep email confirmation enabled, set the email OTP length to
+**6 digits**, and configure the Confirm signup email template to include
+`{{ .Token }}`. The website accepts exactly six numeric digits and verifies
+the code with `supabase.auth.verifyOtp({ type: 'signup' })`.
 You can also use the Supabase dashboard's Authentication → Users page to
 create accounts directly.
 
