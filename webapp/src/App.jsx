@@ -266,7 +266,7 @@ export default function App() {
         aria-label="Open chat"
         title="Open AssistFlow chat"
       >
-        <img src="/bubble-logo.svg" alt="Open chat" className="bubble-logo-img" />
+        <img src="/bubble-logo.png" alt="Open chat" className="bubble-logo-img" />
         <span className="bubble-pulse" />
       </button>
 
