@@ -175,6 +175,7 @@ export default function App() {
   const [input,     setInput]     = useState('');
   const [status,    setStatus]    = useState('Online');
   const [isLoading, setIsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode,  setDarkMode]  = useState(() => {
     try {
       const stored = localStorage.getItem('assistflow-dark');
@@ -336,63 +337,143 @@ export default function App() {
   }, [messages]);
 
   return (
-    <div className="app-shell">
-      <header className="topbar" role="banner">
-        <div className="topbar-left">
-          <p className="eyebrow">AI-Assisted Support System</p>
-          <h1>AssistFlow</h1>
-        </div>
-        <div className="topbar-right">
+    <div className="app-container">
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+          <div>
+            <p className="eyebrow">AI Support System</p>
+            <h2 className="sidebar-title">AssistFlow</h2>
+          </div>
           <button
-            className="dark-toggle"
-            onClick={() => setDarkMode(d => !d)}
-            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={darkMode ? 'Light mode' : 'Dark mode'}
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
+            title="Close sidebar"
           >
-            {darkMode ? '☀️' : '🌙'}
+            ✕
           </button>
-          <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
-            {status}
-          </span>
         </div>
-      </header>
 
-      <main className="chat-panel" role="list" aria-label="Conversation">
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            onFeedback={handleFeedback}
-            onRetry={handleRetry}
-            onTopicSelect={handleTopicSelect}
-          />
-        ))}
-
-        {isLoading && (
-          <div className="message-row assistant" role="status" aria-live="polite">
-            <div className="message-bubble loading-bubble">
-              <span className="dot" /><span className="dot" /><span className="dot" />
+        <div className="sidebar-content">
+          <div className="sidebar-section">
+            <h3 className="section-title">Quick Topics</h3>
+            <div className="quick-topics">
+              <button className="topic-chip" onClick={() => sendMessage("How do I reset my CRM password?")}>
+                🔑 CRM Password Reset
+              </button>
+              <button className="topic-chip" onClick={() => sendMessage("System is running slow")}>
+                ⚡ System Slowness
+              </button>
+              <button className="topic-chip" onClick={() => sendMessage("Call quality issues")}>
+                📞 Call Quality
+              </button>
+              <button className="topic-chip" onClick={() => sendMessage("VPN disconnected")}>
+                🌐 VPN Issues
+              </button>
+              <button className="topic-chip" onClick={() => sendMessage("How do I escalate a ticket?")}>
+                📋 Ticket Escalation
+              </button>
+              <button className="topic-chip" onClick={() => sendMessage("Customer identity verification")}>
+                🆔 Identity Verification
+              </button>
             </div>
           </div>
-        )}
 
-        <div ref={chatEndRef} />
-      </main>
+          <div className="sidebar-section">
+            <h3 className="section-title">Statistics</h3>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-value">{messages.filter(m => m.sender === 'user').length}</div>
+                <div className="stat-label">Questions Asked</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{messages.filter(m => m.source === 'rag').length}</div>
+                <div className="stat-label">AI Responses</div>
+              </div>
+            </div>
+          </div>
 
-      <form className="composer" onSubmit={handleSubmit} role="form" aria-label="Send a message">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Describe the issue or ask for a procedure…"
-          aria-label="Issue description or question"
-          disabled={isLoading}
-        />
-        <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send">
-          {isLoading ? '…' : '↑'}
-        </button>
-      </form>
+          <div className="sidebar-section">
+            <h3 className="section-title">Settings</h3>
+            <div className="settings-list">
+              <button
+                className="setting-item"
+                onClick={() => setDarkMode(d => !d)}
+              >
+                <span>{darkMode ? '☀️' : '🌙'}</span>
+                <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
+              <button
+                className="setting-item"
+                onClick={() => setMessages([WELCOME_MESSAGE])}
+              >
+                <span>🗑️</span>
+                <span>Clear Chat</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main chat area */}
+      <div className="main-area">
+        <header className="chat-header" role="banner">
+          {!sidebarOpen && (
+            <button
+              className="sidebar-toggle open-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
+              title="Open sidebar"
+            >
+              ☰
+            </button>
+          )}
+          <div className="chat-header-content">
+            <h1 className="chat-title">AssistFlow Assistant</h1>
+            <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
+              {status}
+            </span>
+          </div>
+        </header>
+
+        <main className="chat-panel" role="list" aria-label="Conversation">
+          {messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onFeedback={handleFeedback}
+              onRetry={handleRetry}
+              onTopicSelect={handleTopicSelect}
+            />
+          ))}
+
+          {isLoading && (
+            <div className="message-row assistant" role="status" aria-live="polite">
+              <div className="message-bubble loading-bubble">
+                <span className="dot" /><span className="dot" /><span className="dot" />
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </main>
+
+        <form className="composer" onSubmit={handleSubmit} role="form" aria-label="Send a message">
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about procedures, troubleshooting, or policies..."
+            aria-label="Issue description or question"
+            disabled={isLoading}
+          />
+          <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send">
+            {isLoading ? '…' : '↑'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
