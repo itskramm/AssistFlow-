@@ -70,12 +70,37 @@ const FAQ = [
   // ... Add more FAQ entries as needed from the extension version
 ];
 
+const QUICK_RESPONSES = [
+  {
+    matches: /^(hi|hello|hey|hiya|good morning|good afternoon|good evening)( there| assistant| smartops)?$/,
+    answer:
+      'Hello! I can help with CRM access, telephony and call quality, ticket escalation, ' +
+      'customer verification, system outages, and related workplace support issues. ' +
+      'Tell me what is happening and include the platform or error message if you have it.',
+  },
+  {
+    matches: /^(faq|faqs|help|help me|what can you help( me)? with|what do you do|what topics do you support)$/,
+    answer:
+      '1. CRM login, passwords, permissions, and session problems.\n' +
+      '2. Telephony, headset, microphone, call quality, and call routing issues.\n' +
+      '3. Ticket escalation, SLA, status, and transfer procedures.\n' +
+      '4. Customer identity and enhanced verification procedures.\n' +
+      '5. System downtime, outages, recovery, and offline workflows.\n' +
+      'Ask a specific question to get step-by-step guidance.',
+  },
+];
+
 /**
  * Search the FAQ for a matching entry.
  * Returns { answer: string, matched: boolean }
  */
 export function searchFaq(query) {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
+  const quickResponse = QUICK_RESPONSES.find(entry => entry.matches.test(q));
+  if (quickResponse) {
+    return { answer: quickResponse.answer, matched: true };
+  }
+
   let bestScore = 0;
   let bestAnswer = null;
 

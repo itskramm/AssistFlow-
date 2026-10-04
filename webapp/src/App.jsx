@@ -84,6 +84,7 @@ const SOURCE_LABELS = {
   'rag':           { label: 'AI · SOP',      cls: 'source-rag'     },
   'offline-cache': { label: 'Offline cache', cls: 'source-offline' },
   'fallback':      { label: 'No connection', cls: 'source-fallback' },
+  'help':          { label: 'Assistant',     cls: 'source-rag'     },
 };
 
 function SourceBadge({ source }) {
@@ -95,7 +96,7 @@ function SourceBadge({ source }) {
 // ---------------------------------------------------------------------------
 // Message row — ChatGPT style: user right, assistant left with avatar
 // ---------------------------------------------------------------------------
-function MessageRow({ message, onFeedback, onRetry, onTopicSelect }) {
+function MessageRow({ message, selected, onFeedback, onRetry, onTopicSelect }) {
   const isUser      = message.sender === 'user';
   const isAssistant = message.sender === 'assistant';
   const isError     = message.source === 'fallback';
@@ -113,7 +114,10 @@ function MessageRow({ message, onFeedback, onRetry, onTopicSelect }) {
   }
 
   return (
-    <div className="msg-row msg-assistant">
+    <div
+      className={`msg-row msg-assistant ${selected ? 'msg-row-selected' : ''}`}
+      id={message.historyId ? `history-${message.historyId}` : undefined}
+    >
       {/* Avatar */}
       <div className="msg-avatar">
         <img src="/bubble-logo.png" alt="SmartOpsSupportHub" />
@@ -541,6 +545,56 @@ function AccountMenu({ profile, email, onLogout }) {
   );
 }
 
+function HistoryPanel({ items, isOpen, selectedId, onSelect, onNewChat }) {
+  return (
+    <aside className={`history-panel ${isOpen ? 'history-open' : 'history-closed'}`}>
+      <div className="history-header">
+        <div>
+          <p className="history-title">Prompt history</p>
+          <span className="history-subtitle">Your saved conversations</span>
+        </div>
+        <button
+          className="history-new-btn"
+          type="button"
+          onClick={onNewChat}
+          title="Start a new chat"
+        >
+          +
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="history-empty">
+          <span className="history-empty-icon">◷</span>
+          <p>Your saved prompts will appear here.</p>
+        </div>
+      ) : (
+        <div className="history-list">
+          {items.map(item => (
+            <button
+              key={item.id}
+              className={`history-item ${selectedId === item.id ? 'history-item-active' : ''}`}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              title={item.prompt}
+            >
+              <span className="history-item-prompt">{item.prompt}</span>
+              <time dateTime={item.createdAt}>{formatHistoryDate(item.createdAt)}</time>
+            </button>
+          ))}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function formatHistoryDate(value) {
+  if (!value) return 'Saved prompt';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Saved prompt';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 // ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
@@ -553,6 +607,8 @@ export default function App() {
   const [sideInput,  setSideInput]  = useState('');
   const [sideLoading, setSideLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [input,      setInput]      = useState('');
   const [status,     setStatus]     = useState('Online');
   const [isLoading,  setIsLoading]  = useState(false);
@@ -625,6 +681,7 @@ export default function App() {
           feedback: null,
           source: null,
           historyId: row.id,
+          createdAt: row.created_at,
         },
         {
           id: `${row.id}:assistant`,
@@ -635,6 +692,7 @@ export default function App() {
           latency_ms: row.latency_ms,
           userText: row.prompt,
           historyId: row.id,
+          createdAt: row.created_at,
         },
       ]))
   ), []);
@@ -668,6 +726,7 @@ export default function App() {
         setMessages(promptHistoryRowsToMessages(mainRows));
         setSideMessages(promptHistoryRowsToMessages(sidebarRows));
         setChatMode(mainRows.length > 0);
+        setSelectedHistoryId(null);
       });
 
     return () => { active = false; };
@@ -693,7 +752,7 @@ export default function App() {
           latency_ms: latencyMs ?? null,
           channel,
         })
-        .select('id')
+        .select('id, created_at')
         .single();
 
       if (error) {
@@ -795,7 +854,7 @@ export default function App() {
           message.sender === 'assistant' &&
           message.userText === trimmed &&
           !message.historyId
-            ? { ...message, historyId: history.id }
+            ? { ...message, historyId: history.id, createdAt: history.created_at }
             : message
         )));
       }
@@ -834,7 +893,7 @@ export default function App() {
           message.sender === 'assistant' &&
           message.userText === trimmed &&
           !message.historyId
-            ? { ...message, historyId: history.id }
+            ? { ...message, historyId: history.id, createdAt: history.created_at }
             : message
         )));
       }
@@ -859,7 +918,7 @@ export default function App() {
           message.sender === 'assistant' &&
           message.userText === trimmed &&
           !message.historyId
-            ? { ...message, historyId: history.id }
+            ? { ...message, historyId: history.id, createdAt: history.created_at }
             : message
         )));
       }
@@ -900,7 +959,7 @@ export default function App() {
           message.sender === 'assistant' &&
           message.userText === trimmed &&
           !message.historyId
-            ? { ...message, historyId: history.id }
+            ? { ...message, historyId: history.id, createdAt: history.created_at }
             : message
         )));
       }
@@ -937,7 +996,7 @@ export default function App() {
           message.sender === 'assistant' &&
           message.userText === trimmed &&
           !message.historyId
-            ? { ...message, historyId: history.id }
+            ? { ...message, historyId: history.id, createdAt: history.created_at }
             : message
         )));
       }
@@ -959,7 +1018,7 @@ export default function App() {
           message.sender === 'assistant' &&
           message.userText === trimmed &&
           !message.historyId
-            ? { ...message, historyId: history.id }
+            ? { ...message, historyId: history.id, createdAt: history.created_at }
             : message
         )));
       }
@@ -995,9 +1054,30 @@ export default function App() {
   const newChat = () => {
     setMessages([]);
     setChatMode(false);
+    setSelectedHistoryId(null);
     setInput('');
     setTimeout(() => inputRef.current?.focus(), 50);
   };
+
+  const historyItems = messages
+    .filter(message => message.sender === 'assistant' && message.historyId)
+    .map(message => ({
+      id: message.historyId,
+      prompt: message.userText,
+      createdAt: message.createdAt,
+    }))
+    .reverse();
+
+  const selectHistory = useCallback((historyId) => {
+    setChatMode(true);
+    setSelectedHistoryId(historyId);
+    requestAnimationFrame(() => {
+      document.getElementById(`history-${historyId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+  }, []);
 
   if (authLoading) {
     return <main className="login-page"><p className="login-loading">Loading…</p></main>;
@@ -1080,6 +1160,14 @@ export default function App() {
           <span className="topbar-name">SmartOpsSupportHub</span>
         </div>
         <div className="topbar-right">
+          <button
+            className="topbar-btn history-toggle-btn"
+            onClick={() => setHistoryOpen(open => !open)}
+            title={historyOpen ? 'Hide prompt history' : 'Show prompt history'}
+            aria-expanded={historyOpen}
+          >
+            ☰ History
+          </button>
           {chatMode && (
             <button className="topbar-btn new-chat-btn" onClick={newChat} title="New chat">
               ✏️ New chat
@@ -1100,69 +1188,80 @@ export default function App() {
       </header>
 
       {/* ── Main ── */}
-      <main className="chat-main">
+      <div className="workspace-shell">
+        <HistoryPanel
+          items={historyItems}
+          isOpen={historyOpen}
+          selectedId={selectedHistoryId}
+          onSelect={selectHistory}
+          onNewChat={newChat}
+        />
 
-        {/* HOME SCREEN */}
-        {!chatMode && (
-          <div className="home-screen">
-            <div className="home-greeting">
-              <h1 className="greeting-title">How can I help you?</h1>
-              <p className="greeting-sub">
-                Ask about SOPs, troubleshooting, or any workplace procedure.
-              </p>
-            </div>
+        <main className="chat-main">
 
-            <form className="composer-wrap" onSubmit={handleSubmit}>
-              <div className="composer-box">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  className="composer-input"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  placeholder="Ask me anything…"
-                  aria-label="Question"
-                  disabled={isLoading}
-                  autoFocus
-                />
-                <button type="submit" className="composer-send"
-                  disabled={isLoading || !input.trim()} aria-label="Send">
-                  ↑
-                </button>
+          {/* HOME SCREEN */}
+          {!chatMode && (
+            <div className="home-screen">
+              <div className="home-greeting">
+                <h1 className="greeting-title">How can I help you?</h1>
+                <p className="greeting-sub">
+                  Ask about SOPs, troubleshooting, or any workplace procedure.
+                </p>
               </div>
-              <p className="composer-hint">
-                39 offline protocols · Powered by Gemini 2.5 Flash
-              </p>
-            </form>
 
-            {/* Suggestion chips */}
-            <div className="suggestions-grid">
-              {SUGGESTIONS.map(s => (
-                <button key={s.query} className="suggestion-chip"
-                  onClick={() => sendMessage(s.query)}>
-                  <span className="chip-icon">{s.icon}</span>
-                  <span className="chip-label">{s.label}</span>
-                </button>
-              ))}
+              <form className="composer-wrap" onSubmit={handleSubmit}>
+                <div className="composer-box">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="composer-input"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="Ask me anything…"
+                    aria-label="Question"
+                    disabled={isLoading}
+                    autoFocus
+                  />
+                  <button type="submit" className="composer-send"
+                    disabled={isLoading || !input.trim()} aria-label="Send">
+                    ↑
+                  </button>
+                </div>
+                <p className="composer-hint">
+                  39 offline protocols · Powered by Gemini 2.5 Flash
+                </p>
+              </form>
+
+              {/* Suggestion chips */}
+              <div className="suggestions-grid">
+                {SUGGESTIONS.map(s => (
+                  <button key={s.query} className="suggestion-chip"
+                    onClick={() => sendMessage(s.query)}>
+                    <span className="chip-icon">{s.icon}</span>
+                    <span className="chip-label">{s.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* CHAT SCREEN */}
-        {chatMode && (
-          <div className="messages-area">
-            {messages.map(msg => (
-              <MessageRow key={msg.id} message={msg}
-                onFeedback={handleFeedback}
-                onRetry={handleRetry}
-                onTopicSelect={handleTopicSelect}
-              />
-            ))}
-            {isLoading && <TypingRow />}
-            <div ref={chatEndRef} />
-          </div>
-        )}
-      </main>
+          {/* CHAT SCREEN */}
+          {chatMode && (
+            <div className="messages-area">
+              {messages.map(msg => (
+                <MessageRow key={msg.id} message={msg}
+                  selected={msg.historyId === selectedHistoryId}
+                  onFeedback={handleFeedback}
+                  onRetry={handleRetry}
+                  onTopicSelect={handleTopicSelect}
+                />
+              ))}
+              {isLoading && <TypingRow />}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* ── Pinned composer (chat mode only) ── */}
       {chatMode && (

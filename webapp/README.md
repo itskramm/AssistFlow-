@@ -13,6 +13,7 @@ Standalone web version of the AssistFlow Chrome extension. This provides the sam
 - **Supabase email/password login and sign-up** with email OTP verification
 - **Supabase profiles** with an account dropdown in the main page
 - **Per-user prompt history** — prompts, responses, source labels, and ratings are restored after sign-in
+- **Left-side history panel** — browse saved prompts and jump back to an earlier exchange
 - **Responsive design** — works on desktop and tablets
 
 ## Quick Start

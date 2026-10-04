@@ -49,6 +49,21 @@ SCOPE_RESTRICTION_REPLY = (
     "workplace support problems within SmartOpsSupportHub's scope. "
     "Please ask about a supported company or customer issue."
 )
+WELCOME_REPLY = (
+    "Hello! I can help with SmartOpsSupportHub procedures for CRM access, "
+    "telephony and call quality, ticket escalation, customer verification, "
+    "system outages, and related workplace support issues. "
+    "Tell me what is happening and include the platform or error message if you have it."
+)
+FAQ_HELP_REPLY = (
+    "I can help with these supported areas:\n"
+    "1. CRM login, passwords, permissions, and session problems.\n"
+    "2. Telephony, headset, microphone, call quality, and call routing issues.\n"
+    "3. Ticket escalation, SLA, status, and transfer procedures.\n"
+    "4. Customer identity and enhanced verification procedures.\n"
+    "5. System downtime, outages, recovery, and offline workflows.\n"
+    "Ask a specific question to get step-by-step guidance."
+)
 
 # Error substrings that mean "no internet" — skip retries, go straight to offline cache
 _NETWORK_ERRORS = (
@@ -85,6 +100,33 @@ def _has_context_overlap(query: str, context_chunks: list[str]) -> bool:
         if term not in _CONTEXT_STOP_WORDS
     }
     return bool(query_terms & context_terms)
+
+
+def _special_response(query: str) -> str | None:
+    """Return a helpful response for basic assistant navigation requests."""
+    normalized = re.sub(r"[^a-z0-9\s']", " ", query.lower()).strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+
+    if re.fullmatch(
+        r"(hi|hello|hey|hiya|good morning|good afternoon|good evening)"
+        r"( there| assistant| smartops)?",
+        normalized,
+    ):
+        return WELCOME_REPLY
+
+    if normalized in {
+        "faq",
+        "faqs",
+        "help",
+        "help me",
+        "what can you help with",
+        "what can you help me with",
+        "what do you do",
+        "what topics do you support",
+    }:
+        return FAQ_HELP_REPLY
+
+    return None
 
 
 def _check_internet(timeout: float = 3.0) -> bool:
@@ -200,6 +242,17 @@ class ChatService:
         start = time.perf_counter()
         sources: list[str] = []
 
+        special_response = _special_response(text)
+        if special_response:
+            latency_ms = round((time.perf_counter() - start) * 1000, 1)
+            return {
+                "reply": special_response,
+                "status": "ok",
+                "source": "help",
+                "latency_ms": latency_ms,
+                "retrieved_sources": [],
+            }
+
         # ── Step 1: connectivity probe ──────────────────────────────────────
         is_online = await asyncio.to_thread(_check_internet)
 
@@ -254,7 +307,7 @@ class ChatService:
         Public synchronous method used by the /api/offline-query endpoint.
         Queries SQLite directly — no network calls at all.
         """
-        reply = self._offline_fallback(query)
+        reply = _special_response(query) or self._offline_fallback(query)
         if reply is None:
             reply = (
                 f"{SCOPE_RESTRICTION_REPLY} "
@@ -379,8 +432,6 @@ class ChatService:
         # knowledge or ticket context. This prevents the model from answering
         # from its broad pretrained knowledge when retrieval has no support.
         if not context_chunks and not page_section:
-            return SCOPE_RESTRICTION_REPLY
-        if context_chunks and not page_section and not _has_context_overlap(query, context_chunks):
             return SCOPE_RESTRICTION_REPLY
 
         user_content = (
