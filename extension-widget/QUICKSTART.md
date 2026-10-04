@@ -1,7 +1,7 @@
 # 🚀 AssistFlow Extension - 2-Minute Quick Start
 
 ## TL;DR
-Get your AI assistant on every website in 3 steps!
+Get your AI assistant as a Chrome side panel in 3 steps!
 
 ---
 
@@ -34,17 +34,42 @@ In the browser:
 
 ---
 
-## Step 3: Test It! (30 seconds)
+## Step 3: Use the Side Panel! (30 seconds)
 
-1. Visit **any website** (try google.com)
-2. Look for **💬 button** in bottom-right corner
-3. **Click it** → sidebar slides in
-4. Type: **"Hello, can you help me?"**
-5. Press **Enter** or click **Send**
-6. Wait for AI response (~1-2 seconds)
-7. Click **X** or backdrop to close
+1. Look for the **AssistFlow icon** in your Chrome toolbar
+2. **Click the icon** → side panel opens on the right
+3. Type: **"Hello, can you help me?"**
+4. Press **Enter** or click **Send**
+5. Get AI response (~1-2 seconds)
+6. Panel stays open as you browse!
 
 ✅ It works!
+
+---
+
+## What's Different from Before?
+
+### Old Version: Floating Button
+- ❌ Injected into every webpage
+- ❌ Could conflict with website content
+- ❌ Z-index issues
+- ❌ Performance impact
+
+### New Version: Native Side Panel
+- ✅ Native Chrome UI (like DevTools)
+- ✅ No page injection or conflicts
+- ✅ Better performance
+- ✅ Works on ALL pages (even chrome://)
+- ✅ Persistent across tabs
+- ✅ User can resize
+
+---
+
+## Requirements
+
+- **Chrome 114+** (for Side Panel API)
+- Check your version: `chrome://version/`
+- Update Chrome if needed
 
 ---
 
@@ -72,17 +97,19 @@ In the browser:
 
 ## Troubleshooting
 
-**No 💬 button showing?**
-- Refresh the webpage (Cmd+R or Ctrl+R)
-- Check extension is enabled at `chrome://extensions/`
+**No extension icon?**
+- Right-click Chrome toolbar → pin AssistFlow
+- Or click puzzle icon → find AssistFlow → click pin
+
+**Side panel not opening?**
+- Check you have Chrome 114+ (`chrome://version/`)
+- Reload extension at `chrome://extensions/`
+- Check for errors in background service worker
 
 **Chat not responding?**
 - Check backend: https://assistflow-backend-ctbq.onrender.com/api/health
 - Should return: `{"status":"ok"}`
-
-**Icons missing warning?**
-- Make sure you completed Step 1
-- Verify 3 PNG files exist in `extension-widget/icons/`
+- Inspect side panel (right-click → Inspect) for console errors
 
 ---
 

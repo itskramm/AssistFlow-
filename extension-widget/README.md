@@ -1,14 +1,15 @@
 # AssistFlow Chrome Extension
 
-A browser extension that injects the AssistFlow AI assistant as a floating chat bubble on **any webpage** you visit.
+A browser extension that adds the AssistFlow AI assistant as a **native Chrome side panel** - just like Chrome DevTools, but for workplace support!
 
 ## Features
 
-- 💬 **Floating Chat Bubble** - Always accessible from bottom-right corner
-- 🌐 **Works on Any Website** - Available on every webpage you visit
-- 🎨 **Beautiful UI** - Messenger-style sidebar with smooth animations
-- 🚀 **Instant Access** - Click the bubble to slide out the assistant
+- 📌 **Native Side Panel** - Built-in Chrome UI, not injected content
+- 🎨 **Beautiful Interface** - Clean, modern chat design
+- ⚡ **Always Available** - Click extension icon to open side panel
+- 🚀 **Fast & Smooth** - No page impact, runs separately
 - 🔒 **Privacy Focused** - Only communicates with AssistFlow backend
+- 💬 **Full Chat Experience** - Same features as the web app
 
 ## Installation
 
@@ -20,50 +21,53 @@ A browser extension that injects the AssistFlow AI assistant as a floating chat 
 4. Select the `extension-widget` folder
 5. The extension is now installed!
 
-### Option 2: Create Icons First (Recommended)
+### Option 2: Generate Icons First (Recommended)
 
 Before loading, create proper icons:
 
 ```bash
-cd extension-widget/icons
+cd extension-widget
 ```
 
-Create three PNG icons with these dimensions:
+Open `create-icons.html` in your browser and download the three PNG icons:
 - `icon16.png` - 16x16 pixels
 - `icon48.png` - 48x48 pixels  
 - `icon128.png` - 128x128 pixels
 
-**Quick Icon Creation (using ImageMagick):**
-
-```bash
-# Install ImageMagick if needed
-brew install imagemagick
-
-# Create a simple gradient icon
-convert -size 128x128 gradient:#667eea-#764ba2 -font Arial -pointsize 80 -fill white -gravity center -annotate +0+0 "💬" icon128.png
-convert icon128.png -resize 48x48 icon48.png
-convert icon128.png -resize 16x16 icon16.png
-```
+Save them to the `icons/` folder.
 
 ## How to Use
 
-1. **After installation**, visit any website
-2. Look for the **💬 floating button** in the bottom-right corner
-3. **Click the button** to open the AssistFlow assistant
-4. **Start chatting!** Ask questions about workplace procedures, troubleshooting, etc.
-5. Click the **X** or backdrop to close the sidebar
+1. **After installation**, click the **AssistFlow icon** in your Chrome toolbar
+2. The **side panel** opens on the right side of your browser
+3. **Start chatting!** Ask questions about workplace procedures, troubleshooting, etc.
+4. The side panel stays open across tabs - works alongside your browsing
+5. Click the icon again or close the panel to hide it
+
+## What is Chrome Side Panel?
+
+Chrome's side panel is the same UI used by:
+- Chrome DevTools
+- Reading List
+- Bookmarks sidebar
+- Performance insights
+
+It's a **native Chrome feature** that:
+- Doesn't inject into web pages
+- Runs in its own isolated context
+- Stays persistent across tab switches
+- Can be resized by the user
+- Feels like part of the browser
 
 ## Files Structure
 
 ```
 extension-widget/
-├── manifest.json         # Extension configuration
-├── content.js           # Injected on every page
-├── widget.css          # Floating button & sidebar styles
-├── iframe.html         # Chat interface HTML
-├── iframe.js           # Chat logic & API calls
-├── popup.html          # Extension popup UI
-├── popup.js            # Popup logic
+├── manifest.json         # Extension configuration (v3 with side panel)
+├── background.js         # Service worker for side panel
+├── sidepanel.html       # Side panel UI
+├── sidepanel.js         # Side panel logic & API calls
+├── create-icons.html    # Icon generator tool
 ├── icons/
 │   ├── icon16.png
 │   ├── icon48.png
@@ -73,19 +77,21 @@ extension-widget/
 
 ## Architecture
 
-### Content Script Injection
-The extension uses a **content script** (`content.js`) that runs on **every webpage** (`<all_urls>`). This script:
-- Injects the floating 💬 button
-- Creates the sidebar container with iframe
-- Handles open/close animations
-- Listens for messages from the iframe
+### Chrome Side Panel API
+The extension uses Chrome's **Side Panel API** (introduced in Chrome 114):
+- Side panel registered in `manifest.json`
+- Opened via extension icon click
+- Handled by background service worker
+- Runs independently from web pages
 
-### Iframe Isolation
-The chat interface runs in an **isolated iframe** (`iframe.html`) that:
-- Contains the full chat UI
-- Makes API calls to the AssistFlow backend
-- Maintains conversation history
-- Sends close messages to the parent window
+### Benefits Over Content Script Injection
+- ✅ No DOM injection or conflicts
+- ✅ No z-index battles with websites
+- ✅ Native Chrome UI integration
+- ✅ Better performance (separate context)
+- ✅ Persistent across tabs
+- ✅ User can resize the panel
+- ✅ Works on restricted pages (chrome://, etc.)
 
 ### Backend Communication
 All chat requests go to:
@@ -95,27 +101,28 @@ https://assistflow-backend-ctbq.onrender.com/api/chat
 
 ## Permissions Explained
 
-- `storage` - Save user preferences (future feature)
-- `activeTab` - Allow opening chat from toolbar icon
+- `storage` - Save user preferences and conversation history
+- `activeTab` - Allow side panel to know current tab context
+- `sidePanel` - Enable Chrome's native side panel API
 - `host_permissions` - Connect to AssistFlow backend API
-- `<all_urls>` - Inject floating button on every website
 
 ## Troubleshooting
 
-### Extension Not Appearing
-- Check that Developer mode is enabled
-- Ensure the extension is enabled in `chrome://extensions/`
-- Try refreshing the page (Cmd+R / Ctrl+R)
+### Side Panel Not Opening
+- Check that the extension is enabled in `chrome://extensions/`
+- Make sure you're using Chrome 114 or later (Side Panel API requirement)
+- Click the extension icon in the toolbar
+- Check background service worker for errors
 
-### Floating Button Not Showing
-- Open the browser console (F12) and check for errors
-- Look for the message: `✅ AssistFlow widget loaded`
-- Try reloading the extension in `chrome://extensions/`
+### No Extension Icon in Toolbar
+- Right-click the toolbar
+- Select "Show AssistFlow Assistant"
+- Or click the puzzle icon and pin AssistFlow
 
 ### Chat Not Working
 - Check network tab for API call errors
 - Verify backend is running: https://assistflow-backend-ctbq.onrender.com/api/health
-- Check for CORS errors in console
+- Check for CORS errors in console (open DevTools in side panel: right-click → Inspect)
 
 ### Icons Missing Warning
 If you see icon warnings:
