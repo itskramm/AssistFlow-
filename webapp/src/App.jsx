@@ -116,6 +116,8 @@ function MessageRow({ message, onFeedback, onRetry, onTopicSelect }) {
         <img src="/bubble-logo.png" alt="SmartOpsSupportHub" />
       </div>
 
+      <div className="msg-body">
+        <div className={`msg-bubble-assistant ${isError ? 'msg-error' : ''}`}>
           {isTopics
             ? <TopicList onSelect={onTopicSelect} />
             : steps
