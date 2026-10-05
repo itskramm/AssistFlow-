@@ -9,7 +9,7 @@ def test_scope_signal_rejects_unrelated_question():
     assert chat_service_module._has_scope_signal("The customer cannot hear me on the call")
 
 
-def test_response_mode_allows_general_questions_but_protects_company_requests():
+def test_response_mode_allows_general_and_company_questions_without_hard_scope_block():
     assert chat_service_module._response_mode(
         "What is the capital of France?",
         [],
@@ -19,7 +19,7 @@ def test_response_mode_allows_general_questions_but_protects_company_requests():
         "What is our company's password policy?",
         [],
         [],
-    ) == "scope"
+    ) == "general"
     assert chat_service_module._response_mode(
         "How do I reset my CRM password?",
         ["CRM password reset procedure"],
