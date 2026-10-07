@@ -136,61 +136,61 @@ function getEmailCooldown(email) {
   } catch {
     return 0;
   }
+}
 
-  function PasswordField({ id, label, value, onChange, autoComplete, placeholder, onPaste }) {
-    const [visible, setVisible] = useState(false);
-    return (
-      <>
-        <label htmlFor={id}>{label}</label>
-        <div className="password-field">
-          <input
-            id={id}
-            type={visible ? 'text' : 'password'}
-            value={value}
-            onChange={onChange}
-            autoComplete={autoComplete}
-            placeholder={placeholder}
-            onPaste={onPaste}
-          />
-          <button
-            className="password-visibility"
-            type="button"
-            onClick={() => setVisible(current => !current)}
-            aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
-            title={visible ? 'Hide password' : 'Show password'}
-          >
-            {visible ? '◉' : '◌'}
-          </button>
-        </div>
-      </>
-    );
-  }
-
-  function PasswordRequirements({ password }) {
-    const checks = getPasswordChecks(password);
-    const items = [
-      ['length', '8–16 characters'],
-      ['uppercase', 'Uppercase letter'],
-      ['lowercase', 'Lowercase letter'],
-      ['number', 'Number'],
-      ['special', 'Special character'],
-    ];
-    return (
-      <div className={`password-requirements password-strength-${getPasswordStrength(password)}`}>
-        <div className="password-strength-bar" aria-label={`Password strength: ${getPasswordStrength(password)}`} />
-        <span className="password-strength-label">
-          {password ? `Strength: ${getPasswordStrength(password)}` : 'Password requirements'}
-        </span>
-        <ul>
-          {items.map(([key, label]) => (
-            <li key={key} className={checks[key] ? 'requirement-met' : 'requirement-missing'}>
-              <span aria-hidden="true">{checks[key] ? '✓' : '✕'}</span> {label}
-            </li>
-          ))}
-        </ul>
+function PasswordField({ id, label, value, onChange, autoComplete, placeholder, onPaste }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <>
+      <label htmlFor={id}>{label}</label>
+      <div className="password-field">
+        <input
+          id={id}
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={onChange}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          onPaste={onPaste}
+        />
+        <button
+          className="password-visibility"
+          type="button"
+          onClick={() => setVisible(current => !current)}
+          aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          title={visible ? 'Hide password' : 'Show password'}
+        >
+          {visible ? '◉' : '◌'}
+        </button>
       </div>
-    );
-  }
+    </>
+  );
+}
+
+function PasswordRequirements({ password }) {
+  const checks = getPasswordChecks(password);
+  const items = [
+    ['length', '8–16 characters'],
+    ['uppercase', 'Uppercase letter'],
+    ['lowercase', 'Lowercase letter'],
+    ['number', 'Number'],
+    ['special', 'Special character'],
+  ];
+  return (
+    <div className={`password-requirements password-strength-${getPasswordStrength(password)}`}>
+      <div className="password-strength-bar" aria-label={`Password strength: ${getPasswordStrength(password)}`} />
+      <span className="password-strength-label">
+        {password ? `Strength: ${getPasswordStrength(password)}` : 'Password requirements'}
+      </span>
+      <ul>
+        {items.map(([key, label]) => (
+          <li key={key} className={checks[key] ? 'requirement-met' : 'requirement-missing'}>
+            <span aria-hidden="true">{checks[key] ? '✓' : '✕'}</span> {label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function setEmailCooldown(email) {
