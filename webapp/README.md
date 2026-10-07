@@ -59,6 +59,9 @@ dashboard, keep email confirmation enabled, set the email OTP length to
 **6 digits**, and configure the Confirm signup email template to include
 `{{ .Token }}`. The website accepts exactly six numeric digits and verifies
 the code with `supabase.auth.verifyOtp({ type: 'signup' })`.
+The repository's Supabase configuration includes the same six-digit token in
+`supabase/templates/confirmation.html`; push the Auth configuration after
+template changes so the deployed project uses it.
 You can also use the Supabase dashboard's Authentication → Users page to
 create accounts directly.
 
