@@ -16,6 +16,8 @@ const FETCH_TIMEOUT_MS = 15000;
 const HEALTH_POLL_MS   = 30000;
 const PROMPT_HISTORY_LIMIT = 50;
 const OTP_LENGTH       = 6;
+const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
+const EMAIL_RESEND_COOLDOWN_KEY = 'assistflow-email-resend-cooldown';
 
 const SUGGESTIONS = [
   { icon: '🔑', label: 'CRM password reset',   query: 'How do I reset my CRM password?' },
@@ -72,6 +74,27 @@ function parseSteps(text) {
   const re = /^(\d+[.):]\s+|step\s+\d+[.:]\s*)/i;
   const steps = lines.filter(l => re.test(l));
   return steps.length >= 2 ? steps.map(l => l.replace(re, '').trim()) : null;
+}
+
+function getEmailCooldown(email) {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(EMAIL_RESEND_COOLDOWN_KEY) || '{}');
+    const expiresAt = Number(stored[email.trim().toLowerCase()]);
+    return Number.isFinite(expiresAt) ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setEmailCooldown(email) {
+  try {
+    const key = email.trim().toLowerCase();
+    const stored = JSON.parse(window.localStorage.getItem(EMAIL_RESEND_COOLDOWN_KEY) || '{}');
+    stored[key] = Date.now() + EMAIL_RESEND_COOLDOWN_SECONDS * 1000;
+    window.localStorage.setItem(EMAIL_RESEND_COOLDOWN_KEY, JSON.stringify(stored));
+  } catch {
+    // The in-memory cooldown still protects the current page if storage is unavailable.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +251,16 @@ function LoginScreen() {
   const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const isSignUp = mode === 'signup';
+
+  useEffect(() => {
+    if (!resendCooldown) return undefined;
+    const timer = window.setInterval(() => {
+      setResendCooldown(previous => Math.max(0, previous - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -283,6 +315,8 @@ function LoginScreen() {
         setError(signUpError.message);
       } else if (!data.session) {
         setAwaitingOtp(true);
+        setEmailCooldown(email);
+        setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
         setNotice('We sent a verification code to your email.');
         setPassword('');
         setConfirmPassword('');
@@ -309,6 +343,7 @@ function LoginScreen() {
     setAddress('');
     setOtp('');
     setAwaitingOtp(false);
+    setResendCooldown(0);
   };
 
   const verifyEmailOtp = async (event) => {
@@ -344,6 +379,12 @@ function LoginScreen() {
 
   const resendEmailOtp = async () => {
     if (!supabase || !email.trim()) return;
+    const remainingCooldown = Math.max(resendCooldown, getEmailCooldown(email));
+    if (remainingCooldown > 0) {
+      setResendCooldown(remainingCooldown);
+      setError(`Please wait ${remainingCooldown} seconds before requesting another code.`);
+      return;
+    }
     setError('');
     setNotice('');
     setIsSubmitting(true);
@@ -352,10 +393,17 @@ function LoginScreen() {
       email: email.trim(),
     });
     if (resendError) {
-      setError(resendError.message);
+      const providerMessage = resendError.message?.toLowerCase() || '';
+      if (providerMessage.includes('rate limit') || providerMessage.includes('too many')) {
+        setError('Email delivery is temporarily rate-limited. Please wait 60 seconds before trying again.');
+      } else {
+        setError(resendError.message);
+      }
     } else {
       setNotice('A new verification code was sent.');
     }
+    setEmailCooldown(email);
+    setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
     setIsSubmitting(false);
   };
 
@@ -399,8 +447,8 @@ function LoginScreen() {
             </button>
             <p className="login-switch">
               Didn’t receive it?{' '}
-              <button type="button" onClick={resendEmailOtp} disabled={isSubmitting}>
-                Resend code
+              <button type="button" onClick={resendEmailOtp} disabled={isSubmitting || resendCooldown > 0}>
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
               </button>{' '}
               or{' '}
               <button type="button" onClick={() => setAwaitingOtp(false)}>
