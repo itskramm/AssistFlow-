@@ -62,6 +62,27 @@ the code with `supabase.auth.verifyOtp({ type: 'signup' })`.
 You can also use the Supabase dashboard's Authentication → Users page to
 create accounts directly.
 
+The registration form validates full name characters, Philippine mobile
+formats (`09XXXXXXXXX` or `+639XXXXXXXXX`), a dynamically calculated minimum
+age of 18, an email-shaped username, access-type selection, and an 8–16
+character password containing uppercase, lowercase, a number, and a special
+character. Resend requests are throttled for 60 seconds. The effective profile
+role defaults to `User`; selecting `Admin` or `Super Admin` is stored as the
+requested access type, but privileged roles must be assigned by a trusted
+administrator and cannot be self-escalated from the browser.
+
+The Supabase CLI configuration and migrations are stored under `supabase/`.
+After linking the project, apply database and Auth configuration with:
+
+```bash
+supabase db push --linked
+supabase config push --project-ref YOUR_PROJECT_REF
+```
+
+The migration protects security-managed profile fields and validates the
+registration metadata again in the database trigger. Configure production
+SMTP in Supabase before relying on signup or reset email delivery at scale.
+
 Run `supabase/schema.sql` in the Supabase SQL Editor to create or update the
 protected `profiles` table, the per-user `prompt_conversations` and
 `prompt_history` tables, and the trigger

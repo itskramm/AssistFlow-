@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { searchFaq, getTopicList } from './offlineFaq.js';
-import { isSupabaseConfigured, supabase } from './supabaseClient.js';
+import { isSupabaseConfigured, setRememberMe, supabase } from './supabaseClient.js';
 
 const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow-backend-ctbq.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
@@ -18,6 +18,8 @@ const PROMPT_HISTORY_LIMIT = 50;
 const OTP_LENGTH       = 6;
 const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
 const EMAIL_RESEND_COOLDOWN_KEY = 'assistflow-email-resend-cooldown';
+const INACTIVITY_TIMEOUT_MS = 60 * 1000;
+const MINIMUM_AGE = 18;
 
 const SUGGESTIONS = [
   { icon: '🔑', label: 'CRM password reset',   query: 'How do I reset my CRM password?' },
@@ -76,6 +78,56 @@ function parseSteps(text) {
   return steps.length >= 2 ? steps.map(l => l.replace(re, '').trim()) : null;
 }
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(value.trim());
+}
+
+function isValidFullName(value) {
+  return /^\p{L}+(?:[ '\u2019-]\p{L}+)*$/u.test(value.trim());
+}
+
+function isValidPhilippineMobile(value) {
+  return /^(?:09\d{9}|\+639\d{9})$/.test(value.trim());
+}
+
+function getMaximumBirthDate() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - MINIMUM_AGE);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function isAtLeastMinimumAge(value) {
+  if (!value) return false;
+  const birthday = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(birthday.getTime())) return false;
+  const today = new Date();
+  const minimumDate = new Date(today.getFullYear() - MINIMUM_AGE, today.getMonth(), today.getDate());
+  return birthday <= minimumDate;
+}
+
+function getPasswordChecks(value) {
+  return {
+    length: value.length >= 8 && value.length <= 16,
+    uppercase: /[A-Z]/.test(value),
+    lowercase: /[a-z]/.test(value),
+    number: /\d/.test(value),
+    special: /[^A-Za-z\d]/.test(value),
+  };
+}
+
+function isValidPassword(value) {
+  return Object.values(getPasswordChecks(value)).every(Boolean);
+}
+
+function getPasswordStrength(value) {
+  const score = Object.values(getPasswordChecks(value)).filter(Boolean).length;
+  if (score === 5) return 'strong';
+  if (score >= 3) return 'average';
+  return 'weak';
+}
+
 function getEmailCooldown(email) {
   try {
     const stored = JSON.parse(window.localStorage.getItem(EMAIL_RESEND_COOLDOWN_KEY) || '{}');
@@ -83,6 +135,61 @@ function getEmailCooldown(email) {
     return Number.isFinite(expiresAt) ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)) : 0;
   } catch {
     return 0;
+  }
+
+  function PasswordField({ id, label, value, onChange, autoComplete, placeholder, onPaste }) {
+    const [visible, setVisible] = useState(false);
+    return (
+      <>
+        <label htmlFor={id}>{label}</label>
+        <div className="password-field">
+          <input
+            id={id}
+            type={visible ? 'text' : 'password'}
+            value={value}
+            onChange={onChange}
+            autoComplete={autoComplete}
+            placeholder={placeholder}
+            onPaste={onPaste}
+          />
+          <button
+            className="password-visibility"
+            type="button"
+            onClick={() => setVisible(current => !current)}
+            aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+            title={visible ? 'Hide password' : 'Show password'}
+          >
+            {visible ? '◉' : '◌'}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  function PasswordRequirements({ password }) {
+    const checks = getPasswordChecks(password);
+    const items = [
+      ['length', '8–16 characters'],
+      ['uppercase', 'Uppercase letter'],
+      ['lowercase', 'Lowercase letter'],
+      ['number', 'Number'],
+      ['special', 'Special character'],
+    ];
+    return (
+      <div className={`password-requirements password-strength-${getPasswordStrength(password)}`}>
+        <div className="password-strength-bar" aria-label={`Password strength: ${getPasswordStrength(password)}`} />
+        <span className="password-strength-label">
+          {password ? `Strength: ${getPasswordStrength(password)}` : 'Password requirements'}
+        </span>
+        <ul>
+          {items.map(([key, label]) => (
+            <li key={key} className={checks[key] ? 'requirement-met' : 'requirement-missing'}>
+              <span aria-hidden="true">{checks[key] ? '✓' : '✕'}</span> {label}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   }
 }
 
@@ -244,15 +351,21 @@ function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [birthday, setBirthday] = useState('');
   const [address, setAddress] = useState('');
+  const [accessType, setAccessType] = useState('User');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [rememberMe, setRememberMePreference] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const [otpPurpose, setOtpPurpose] = useState('signup');
+  const [awaitingResetPassword, setAwaitingResetPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const isSignUp = mode === 'signup';
+  const isForgotPassword = mode === 'forgot';
+  const maximumBirthDate = getMaximumBirthDate();
 
   useEffect(() => {
     if (!resendCooldown) return undefined;
@@ -265,28 +378,68 @@ function LoginScreen() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!supabase) return;
-    if (!email.trim() || !password) {
-      setError('Enter your email and password.');
+    const trimmedEmail = email.trim();
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Enter a valid email address, including a domain such as name@example.com.');
       return;
     }
+    if (isForgotPassword) {
+      setError('');
+      setNotice('');
+      setIsSubmitting(true);
+      const { error: resetError } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: { shouldCreateUser: false },
+      });
+      if (resetError) {
+        setError(resetError.message);
+      } else {
+        setOtpPurpose('recovery');
+        setAwaitingOtp(true);
+        setEmailCooldown(trimmedEmail);
+        setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
+        setNotice('If an account exists for this email, a verification code has been sent.');
+      }
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!password) {
+      setError('Enter your password.');
+      return;
+    }
+
     if (isSignUp && !fullName.trim()) {
       setError('Enter your full name.');
+      return;
+    }
+    if (isSignUp && !isValidFullName(fullName)) {
+      setError('Full Name may contain letters, spaces, hyphens, and apostrophes only.');
       return;
     }
     if (isSignUp && !phone.trim()) {
       setError('Enter your phone number.');
       return;
     }
+    if (isSignUp && !isValidPhilippineMobile(phone)) {
+      setError('Enter a valid Philippine mobile number: 09XXXXXXXXX or +639XXXXXXXXX.');
+      return;
+    }
     if (isSignUp && !birthday) {
       setError('Enter your birthday.');
+      return;
+    }
+    if (isSignUp && !isAtLeastMinimumAge(birthday)) {
+      setError('You must be at least 18 years old to create an account.');
       return;
     }
     if (isSignUp && !address.trim()) {
       setError('Enter your address.');
       return;
     }
-    if (isSignUp && password.length < 8) {
-      setError('Use a password with at least 8 characters.');
+    if (isSignUp && !isValidPassword(password)) {
+      setError('Password must be 8–16 characters and include uppercase, lowercase, number, and special character.');
       return;
     }
     if (isSignUp && password !== confirmPassword) {
@@ -299,7 +452,7 @@ function LoginScreen() {
     setIsSubmitting(true);
     if (isSignUp) {
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
         options: {
           emailRedirectTo: window.location.origin,
@@ -308,31 +461,52 @@ function LoginScreen() {
             phone: phone.trim(),
             birthday,
             address: address.trim(),
+            access_type: accessType,
           },
         },
       });
       if (signUpError) {
-        setError(signUpError.message);
+        const message = signUpError.message?.toLowerCase() || '';
+        setError(
+          message.includes('already') || message.includes('registered')
+            ? 'Email already registered. Please use a different email address or reset your password.'
+            : signUpError.message
+        );
+      } else if (data.user?.identities?.length === 0) {
+        setError('Email already registered. Please use a different email address or reset your password.');
       } else if (!data.session) {
         setAwaitingOtp(true);
-        setEmailCooldown(email);
+        setEmailCooldown(trimmedEmail);
         setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
         setNotice('We sent a verification code to your email.');
         setPassword('');
         setConfirmPassword('');
+      } else {
+        await supabase.auth.signOut();
+        setMode('login');
+        setNotice('Account Created Successfully! Please sign in with your new credentials.');
+        setPassword('');
+        setConfirmPassword('');
       }
     } else {
+      setRememberMe(rememberMe);
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
       });
-      if (signInError) setError(signInError.message);
+      if (signInError) {
+        setError(
+          signInError.message?.toLowerCase().includes('email not confirmed')
+            ? 'Please verify your email before signing in.'
+            : 'Invalid email or password.'
+        );
+      }
     }
     setIsSubmitting(false);
   };
 
   const switchMode = () => {
-    setMode(isSignUp ? 'login' : 'signup');
+    setMode('login');
     setError('');
     setNotice('');
     setPassword('');
@@ -341,9 +515,24 @@ function LoginScreen() {
     setPhone('');
     setBirthday('');
     setAddress('');
+    setAccessType('User');
     setOtp('');
     setAwaitingOtp(false);
+    setOtpPurpose('signup');
+    setAwaitingResetPassword(false);
     setResendCooldown(0);
+  };
+
+  const switchTo = nextMode => {
+    setMode(nextMode);
+    setError('');
+    setNotice('');
+    setPassword('');
+    setConfirmPassword('');
+    setOtp('');
+    setAwaitingOtp(false);
+    setOtpPurpose('signup');
+    setAwaitingResetPassword(false);
   };
 
   const verifyEmailOtp = async (event) => {
@@ -363,13 +552,18 @@ function LoginScreen() {
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: trimmedOtp,
-      type: 'signup',
+      type: otpPurpose === 'signup' ? 'signup' : 'email',
     });
     if (verifyError) {
       setError(verifyError.message);
-    } else {
+    } else if (otpPurpose === 'recovery') {
       setAwaitingOtp(false);
-      setNotice('Email verified. You can now sign in.');
+      setAwaitingResetPassword(true);
+      setNotice('Code verified. Choose a new password.');
+    } else {
+      await supabase.auth.signOut();
+      setAwaitingOtp(false);
+      setNotice('Account Created Successfully! Your email is verified. Please sign in.');
       setMode('login');
       setPassword('');
       setOtp('');
@@ -388,10 +582,13 @@ function LoginScreen() {
     setError('');
     setNotice('');
     setIsSubmitting(true);
-    const { error: resendError } = await supabase.auth.resend({
-      type: 'signup',
-      email: email.trim(),
-    });
+    const resendResult = otpPurpose === 'signup'
+      ? await supabase.auth.resend({ type: 'signup', email: email.trim() })
+      : await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { shouldCreateUser: false },
+      });
+    const resendError = resendResult.error;
     if (resendError) {
       const providerMessage = resendError.message?.toLowerCase() || '';
       if (providerMessage.includes('rate limit') || providerMessage.includes('too many')) {
@@ -407,16 +604,46 @@ function LoginScreen() {
     setIsSubmitting(false);
   };
 
+  const resetPasswordWithOtp = async event => {
+    event.preventDefault();
+    if (!isValidPassword(password)) {
+      setError('Password must be 8–16 characters and include uppercase, lowercase, number, and special character.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setError('');
+    setIsSubmitting(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      await supabase.auth.signOut();
+      setAwaitingResetPassword(false);
+      setMode('login');
+      setPassword('');
+      setConfirmPassword('');
+      setNotice('Password reset successfully. Please sign in again.');
+    }
+    setIsSubmitting(false);
+  };
+
   return (
     <main className="login-page">
       <section className="login-card" aria-labelledby="login-title">
         <img className="login-logo" src="/bubble-logo.png" alt="SmartOpsSupportHub" />
         <p className="login-eyebrow">WORKPLACE SUPPORT</p>
-        <h1 id="login-title">{isSignUp ? 'Create your account' : 'Welcome back'}</h1>
+        <h1 id="login-title">
+          {isSignUp ? 'Create your account' : isForgotPassword ? 'Reset your password' : 'Welcome back'}
+        </h1>
         <p className="login-subtitle">
           {isSignUp
-            ? 'Create an account to start using SmartOpsSupportHub.'
-            : 'Sign in to access SmartOpsSupportHub.'}
+            ? 'Complete every field to create a secure account.'
+            : isForgotPassword
+              ? 'Enter your registered email to receive a secure reset link.'
+              : 'Sign in to access SmartOpsSupportHub.'}
         </p>
 
         {!isSupabaseConfigured ? (
@@ -426,7 +653,9 @@ function LoginScreen() {
           </p>
         ) : awaitingOtp ? (
           <form className="login-form" onSubmit={verifyEmailOtp}>
-            <label htmlFor="login-otp">6-digit email verification code</label>
+            <label htmlFor="login-otp">
+              {otpPurpose === 'signup' ? '6-digit email verification code' : '6-digit password reset code'}
+            </label>
             <input
               id="login-otp"
               type="text"
@@ -456,6 +685,31 @@ function LoginScreen() {
               </button>
             </p>
           </form>
+        ) : awaitingResetPassword ? (
+          <form className="login-form" onSubmit={resetPasswordWithOtp}>
+            <PasswordField
+              id="forgot-new-password"
+              label="New password"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              autoComplete="new-password"
+              placeholder="Enter a new password"
+            />
+            <PasswordRequirements password={password} />
+            <PasswordField
+              id="forgot-confirm-password"
+              label="Confirm new password"
+              value={confirmPassword}
+              onChange={event => setConfirmPassword(event.target.value)}
+              autoComplete="new-password"
+              placeholder="Re-enter the new password"
+              onPaste={event => event.preventDefault()}
+            />
+            {error && <p className="login-error" role="alert">{error}</p>}
+            <button className="login-submit" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving…' : 'Save new password'}
+            </button>
+          </form>
         ) : (
           <form className="login-form" onSubmit={handleSubmit}>
             {isSignUp && (
@@ -470,6 +724,11 @@ function LoginScreen() {
                   placeholder="Your full name"
                   autoFocus
                 />
+                {fullName && !isValidFullName(fullName) && (
+                  <p className="login-field-warning" role="alert">
+                    Use letters, spaces, hyphens, or apostrophes only.
+                  </p>
+                )}
                 <label htmlFor="login-phone">Phone number</label>
                 <input
                   id="login-phone"
@@ -479,8 +738,13 @@ function LoginScreen() {
                   inputMode="tel"
                   autoComplete="tel"
                   spellCheck="false"
-                  placeholder="+1 555 123 4567"
+                  placeholder="09171234567 or +639171234567"
                 />
+                {phone && !isValidPhilippineMobile(phone) && (
+                  <p className="login-field-warning" role="alert">
+                    Use 09XXXXXXXXX or +639XXXXXXXXX.
+                  </p>
+                )}
                 <label htmlFor="login-birthday">Birthday</label>
                 <input
                   id="login-birthday"
@@ -488,7 +752,9 @@ function LoginScreen() {
                   value={birthday}
                   onChange={event => setBirthday(event.target.value)}
                   autoComplete="bday"
+                  max={maximumBirthDate}
                 />
+                <p className="login-field-hint">You must be at least 18 years old.</p>
                 <label htmlFor="login-address">Address</label>
                 <textarea
                   id="login-address"
@@ -498,9 +764,19 @@ function LoginScreen() {
                   placeholder="Your address"
                   rows="3"
                 />
+                <label htmlFor="login-access-type">Access type</label>
+                <select
+                  id="login-access-type"
+                  value={accessType}
+                  onChange={event => setAccessType(event.target.value)}
+                >
+                  <option value="Super Admin">Super Admin</option>
+                  <option value="Admin">Admin</option>
+                  <option value="User">User</option>
+                </select>
               </>
             )}
-            <label htmlFor="login-email">Work email</label>
+            <label htmlFor="login-email">{isSignUp ? 'Username / email address' : 'Username / email address'}</label>
             <input
               id="login-email"
               type="email"
@@ -510,39 +786,66 @@ function LoginScreen() {
               placeholder="you@company.com"
               autoFocus={!isSignUp}
             />
-            <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              placeholder="Enter your password"
-            />
-            {isSignUp && (
+            {!isForgotPassword && (
               <>
-                <label htmlFor="login-confirm-password">Confirm password</label>
-                <input
-                  id="login-confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={event => setConfirmPassword(event.target.value)}
-                  autoComplete="new-password"
-                  placeholder="Re-enter your password"
+                <PasswordField
+                  id="login-password"
+                  label="Password"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  placeholder="Enter your password"
                 />
-                <p className="login-field-hint">Use at least 8 characters.</p>
+                {isSignUp && <PasswordRequirements password={password} />}
+                {isSignUp && (
+                  <>
+                    <PasswordField
+                      id="login-confirm-password"
+                      label="Confirm password"
+                      value={confirmPassword}
+                      onChange={event => setConfirmPassword(event.target.value)}
+                      autoComplete="new-password"
+                      placeholder="Re-enter your password"
+                      onPaste={event => event.preventDefault()}
+                    />
+                    {confirmPassword && confirmPassword !== password && (
+                      <p className="login-field-warning" role="alert">Passwords do not match.</p>
+                    )}
+                    <p className="login-field-hint">For security, confirmation must be typed manually.</p>
+                  </>
+                )}
               </>
             )}
             {error && <p className="login-error" role="alert">{error}</p>}
             {notice && <p className="login-notice" role="status">{notice}</p>}
             <button className="login-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+              {isSubmitting ? 'Please wait…' : isSignUp ? 'Create account' : isForgotPassword ? 'Send reset link' : 'Sign in'}
             </button>
+            {!isSignUp && !isForgotPassword && (
+              <label className="remember-me">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={event => setRememberMePreference(event.target.checked)}
+                />
+                Remember me
+              </label>
+            )}
             <p className="login-switch">
-              {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
-              <button type="button" onClick={switchMode}>
-                {isSignUp ? 'Sign in' : 'Create one'}
-              </button>
+              {isForgotPassword ? (
+                <button type="button" onClick={switchMode}>Back to sign in</button>
+              ) : (
+                <>
+                  {!isSignUp && (
+                    <button type="button" onClick={() => switchTo('forgot')}>Forgot password?</button>
+                  )}
+                  {' '}
+                  {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
+                  <button type="button" onClick={isSignUp ? switchMode : () => switchTo('signup')}>
+                    {isSignUp ? 'Sign in' : 'Create one'}
+                  </button>
+                </>
+              )}
             </p>
           </form>
         )}
@@ -551,7 +854,81 @@ function LoginScreen() {
   );
 }
 
-function AccountMenu({ profile, email, onLogout }) {
+function PasswordResetScreen({ onComplete }) {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completed, setCompleted] = useState(false);
+
+  const handleSubmit = async event => {
+    event.preventDefault();
+    if (!isValidPassword(password)) {
+      setError('Password must be 8–16 characters and include uppercase, lowercase, number, and special character.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setError('');
+    setIsSubmitting(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setNotice('Password reset successfully. Please sign in again.');
+      setCompleted(true);
+      await supabase.auth.signOut();
+    }
+    setIsSubmitting(false);
+  };
+
+  return (
+    <main className="login-page">
+      <section className="login-card" aria-labelledby="reset-password-title">
+        <img className="login-logo" src="/bubble-logo.png" alt="SmartOpsSupportHub" />
+        <p className="login-eyebrow">ACCOUNT SECURITY</p>
+        <h1 id="reset-password-title">Reset password</h1>
+        {completed ? (
+          <>
+            <p className="login-notice" role="status">{notice}</p>
+            <button className="login-submit" type="button" onClick={onComplete}>Return to login</button>
+          </>
+        ) : (
+          <form className="login-form" onSubmit={handleSubmit}>
+            <p className="login-subtitle">Choose a new password that has not been used before.</p>
+            <PasswordField
+              id="reset-password"
+              label="New password"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              autoComplete="new-password"
+              placeholder="Enter a new password"
+            />
+            <PasswordRequirements password={password} />
+            <PasswordField
+              id="reset-confirm-password"
+              label="Confirm new password"
+              value={confirmPassword}
+              onChange={event => setConfirmPassword(event.target.value)}
+              autoComplete="new-password"
+              placeholder="Re-enter the new password"
+              onPaste={event => event.preventDefault()}
+            />
+            {error && <p className="login-error" role="alert">{error}</p>}
+            <button className="login-submit" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving…' : 'Save new password'}
+            </button>
+          </form>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function AccountMenu({ profile, email, onLogout, onResetPassword }) {
   const [isOpen, setIsOpen] = useState(false);
   const displayName = profile?.full_name || email?.split('@')[0] || 'Account';
   const initials = displayName
@@ -584,8 +961,8 @@ function AccountMenu({ profile, email, onLogout }) {
             </div>
           </div>
           <div className="account-profile-row">
-            <span>Profile</span>
-            <span>{profile?.role || 'Support agent'}</span>
+            <span>Access type</span>
+            <span>{profile?.role || profile?.access_type || 'User'}</span>
           </div>
           <div className="account-profile-row">
             <span>Phone</span>
@@ -599,6 +976,9 @@ function AccountMenu({ profile, email, onLogout }) {
             <span>Address</span>
             <span>{profile?.address || 'Not provided'}</span>
           </div>
+          <button className="account-reset" type="button" onClick={onResetPassword} role="menuitem">
+            Reset password
+          </button>
           <button className="account-signout" type="button" onClick={onLogout} role="menuitem">
             Sign out
           </button>
@@ -664,6 +1044,7 @@ function formatHistoryDate(value) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [profile, setProfile] = useState(null);
   const [messages,   setMessages]   = useState([]);
   const [sideMessages, setSideMessages] = useState([]);
@@ -709,7 +1090,10 @@ export default function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => setSession(nextSession)
+      (event, nextSession) => {
+        if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
+        setSession(nextSession);
+      }
     );
     return () => {
       active = false;
@@ -726,7 +1110,7 @@ export default function App() {
     let active = true;
     supabase
       .from('profiles')
-      .select('full_name, email, phone_number, birthday, address, role, avatar_url')
+      .select('full_name, email, phone_number, birthday, address, role, access_type, avatar_url')
       .eq('id', session.user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -734,6 +1118,27 @@ export default function App() {
       });
 
     return () => { active = false; };
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return undefined;
+
+    let timeoutId;
+    const resetInactivityTimer = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        setRecoveryMode(false);
+        supabase?.auth.signOut();
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+    const activityEvents = ['pointerdown', 'keydown', 'mousemove', 'touchstart', 'scroll'];
+    activityEvents.forEach(event => window.addEventListener(event, resetInactivityTimer, { passive: true }));
+    resetInactivityTimer();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activityEvents.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+    };
   }, [session]);
 
   const promptHistoryRowsToMessages = useCallback((rows) => (
@@ -1254,6 +1659,17 @@ export default function App() {
     return <main className="login-page"><p className="login-loading">Loading…</p></main>;
   }
 
+  if (recoveryMode) {
+    return (
+      <PasswordResetScreen
+        onComplete={() => {
+          setRecoveryMode(false);
+          setSession(null);
+        }}
+      />
+    );
+  }
+
   if (!session) return <LoginScreen />;
 
   return (
@@ -1347,6 +1763,9 @@ export default function App() {
           <span className={`status-pill ${status === 'Offline' ? 'offline' : 'online'}`}>
             {status}
           </span>
+          <span className="access-type-badge">
+            Access Type: {profile?.role || profile?.access_type || 'User'}
+          </span>
           <button className="topbar-icon-btn" onClick={() => setDarkMode(d => !d)} aria-label="Toggle dark mode">
             {darkMode ? '☀️' : '🌙'}
           </button>
@@ -1354,6 +1773,9 @@ export default function App() {
             profile={profile}
             email={session.user.email}
             onLogout={handleLogout}
+            onResetPassword={() => {
+              setRecoveryMode(true);
+            }}
           />
         </div>
       </header>
