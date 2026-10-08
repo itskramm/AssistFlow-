@@ -59,9 +59,6 @@ dashboard, keep email confirmation enabled, set the email OTP length to
 **6 digits**, and configure the Confirm signup email template to include
 `{{ .Token }}`. The website accepts exactly six numeric digits and verifies
 the code with `supabase.auth.verifyOtp({ type: 'signup' })`.
-The repository's Supabase configuration includes the same six-digit token in
-`supabase/templates/confirmation.html`; push the Auth configuration after
-template changes so the deployed project uses it.
 You can also use the Supabase dashboard's Authentication → Users page to
 create accounts directly.
 
@@ -75,6 +72,8 @@ requested access type, but privileged roles must be assigned by a trusted
 administrator and cannot be self-escalated from the browser.
 
 The Supabase CLI configuration and migrations are stored under `supabase/`.
+This project currently uses Supabase's default email provider, which only
+sends to authorized project/team email addresses and has strict rate limits.
 After linking the project, apply database and Auth configuration with:
 
 ```bash
@@ -83,8 +82,8 @@ supabase config push --project-ref YOUR_PROJECT_REF
 ```
 
 The migration protects security-managed profile fields and validates the
-registration metadata again in the database trigger. Configure production
-SMTP in Supabase before relying on signup or reset email delivery at scale.
+registration metadata again in the database trigger. Configure custom SMTP in
+Supabase before relying on signup or reset email delivery to public users.
 
 Run `supabase/schema.sql` in the Supabase SQL Editor to create or update the
 protected `profiles` table, the per-user `prompt_conversations` and

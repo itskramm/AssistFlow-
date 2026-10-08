@@ -243,20 +243,10 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
-
-# Uncomment to customize email template
-[auth.email.template.confirmation]
-subject = "Your SmartOpsSupportHub verification code"
-content_path = "./supabase/templates/confirmation.html"
+# Use Supabase's default email provider. It is restricted to authorized
+# project/team addresses and has strict rate limits.
+[auth.email.smtp]
+enabled = false
 
 # [auth.email.template.invite]
 # subject = "You have been invited"
