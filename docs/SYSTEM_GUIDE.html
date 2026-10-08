@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SmartOpsSupportHub — System Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --accent:   #10a37f;
+    --accent2:  #1a7f64;
+    --bg:       #ffffff;
+    --surface:  #f7f7f8;
+    --border:   #e5e5e5;
+    --text:     #1a1a1a;
+    --muted:    #6b7280;
+    --code-bg:  #f4f4f5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    background: #fff;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 56px 48px;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 64px 0 80px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 64px;
+  }
+
+  .cover-logo {
+    width: 80px; height: 80px;
+    background: var(--accent);
+    border-radius: 20px;
+    margin: 0 auto 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px;
+  }
+
+  .cover h1 {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .cover .subtitle {
+    font-size: 16px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+
+  .cover .meta {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .cover .meta span { display: flex; align-items: center; gap: 6px; }
+
+  /* ── TOC ── */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 64px;
+  }
+
+  .toc h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 16px; }
+
+  .toc ol { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .toc li { font-size: 14px; }
+  .toc a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ── Sections ── */
+  section { margin-bottom: 72px; }
+  section + section { border-top: 1px solid var(--border); padding-top: 56px; }
+
+  h2.section-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  h2.section-title .num {
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .section-desc { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+  h3 { font-size: 17px; font-weight: 700; margin: 28px 0 10px; color: var(--text); }
+  h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: var(--text); }
+
+  p { margin-bottom: 14px; color: var(--text); }
+
+  /* ── Cards ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin: 16px 0 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .card-icon { font-size: 28px; margin-bottom: 10px; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { font-size: 13px; color: var(--muted); margin: 0; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+
+  th {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: var(--surface); }
+
+  /* ── Code ── */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    padding: 2px 7px;
+    border-radius: 5px;
+    color: #1a1a1a;
+  }
+
+  pre {
+    background: #1a1a1a;
+    color: #e5e5e5;
+    border-radius: 10px;
+    padding: 20px 24px;
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-green  { background: #dcfce7; color: #166534; }
+  .badge-blue   { background: #dbeafe; color: #1e40af; }
+  .badge-orange { background: #fef3c7; color: #92400e; }
+  .badge-gray   { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Flow diagram ── */
+  .flow {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    margin: 20px 0 28px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.9;
+    color: #1a1a1a;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* ── Step list ── */
+  .steps { display: flex; flex-direction: column; gap: 14px; margin: 16px 0 24px; }
+
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .step-body h4 { margin: 0 0 4px; font-size: 14px; }
+  .step-body p  { margin: 0; font-size: 13px; color: var(--muted); }
+
+  /* ── Alert box ── */
+  .alert {
+    border-left: 4px solid var(--accent);
+    background: #f0fdf4;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+
+  .alert strong { color: var(--accent2); }
+
+  ul, ol { padding-left: 20px; margin-bottom: 14px; }
+  li { margin-bottom: 4px; font-size: 14px; }
+
+  /* ── Page break hint for print ── */
+  @media print {
+    section + section { page-break-before: always; }
+    .cover { page-break-after: always; }
+    .toc   { page-break-after: always; }
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 32px 24px; }
+    .cover h1 { font-size: 26px; }
+    .card-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-logo">🤖</div>
+  <h1>SmartOpsSupportHub</h1>
+  <p class="subtitle">AI-Assisted Workplace Support System for Call Center Agents<br>System Guide &amp; Component Reference</p>
+  <div class="meta">
+    <span>📅 2026</span>
+    <span>🔖 Version 2.0</span>
+    <span>🏫 Thesis Project</span>
+    <span>⚡ Powered by Gemini 2.5 Flash</span>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#overview">System Overview</a></li>
+    <li><a href="#architecture">System Architecture</a></li>
+    <li><a href="#components">System Components</a></li>
+    <li><a href="#knowledge">Knowledge Base</a></li>
+    <li><a href="#rag">RAG Pipeline — How Retrieval Works</a></li>
+    <li><a href="#gemini">Gemini API Integration</a></li>
+    <li><a href="#offline">Offline Mode &amp; Downtime Resilience</a></li>
+    <li><a href="#ui">User Interface</a></li>
+    <li><a href="#api">API Reference</a></li>
+    <li><a href="#evaluation">Performance Evaluation</a></li>
+    <li><a href="#setup">Setup &amp; Deployment</a></li>
+    <li><a href="#stack">Technology Stack</a></li>
+  </ol>
+</div>
+
+<!-- 1. OVERVIEW -->
+<section id="overview">
+  <h2 class="section-title"><span class="num">01</span> System Overview</h2>
+  <p class="section-desc">What SmartOpsSupportHub is, what problem it solves, and who it is for.</p>
+
+  <p>SmartOpsSupportHub is an AI-powered workplace support system built specifically for call center agents. It gives agents instant, step-by-step guidance on company procedures, system errors, and troubleshooting workflows — without requiring them to leave their main workspace or search through folders of documents.</p>
+
+  <p>The system uses <strong>Retrieval-Augmented Generation (RAG)</strong> — a technique that combines a searchable knowledge base with a large language model — so every answer is grounded in real company SOPs rather than the model's general training data.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">🎯</div>
+      <h4>The Problem</h4>
+      <p>Call center agents waste time searching PDF folders and document portals for the right procedure while a customer is waiting on the line.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">💡</div>
+      <h4>The Solution</h4>
+      <p>A conversational AI assistant that retrieves the right SOP instantly and presents it as numbered action steps in a familiar chat interface.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔒</div>
+      <h4>Key Guarantee</h4>
+      <p>Answers are always grounded in internal documents. The system clearly labels when it falls back to general knowledge and never invents company policy.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📡</div>
+      <h4>Always Available</h4>
+      <p>39 offline protocols are cached in a local SQLite database. The assistant continues working during full internet or backend outages.</p>
+    </div>
+  </div>
+
+  <div class="alert">
+    <strong>Thesis context:</strong> This system was developed as a thesis project titled <em>"Design and Development of an AI-Assisted Workplace Support System for Improving Workflow Efficiency and System Usability."</em>
+  </div>
+</section>
+
+<!-- 2. ARCHITECTURE -->
+<section id="architecture">
+  <h2 class="section-title"><span class="num">02</span> System Architecture</h2>
+  <p class="section-desc">How the major layers connect and communicate.</p>
+
+  <div class="flow">  ┌─────────────────────────────────────────────────────┐
+  │               USER INTERFACES                       │
+  │                                                     │
+  │  ┌───────────────┐         ┌────────────────────┐   │
+  │  │  Web App      │         │  Chrome Extension  │   │
+  │  │  (React/Vite) │         │  (Side Panel MV3)  │   │
+  │  │               │         │                    │   │
+  │  │  • Main chat  │         │  • Toolbar button  │   │
+  │  │  • Side panel │         │  • Native panel    │   │
+  │  │  • Offline FAQ│         │  • CRM context     │   │
+  │  └──────┬────────┘         └────────┬───────────┘   │
+  └─────────┼────────────────────────── ┼ ──────────────┘
+            │  POST /api/chat           │
+            └──────────────┬────────────┘
+                           ▼
+  ┌─────────────────────────────────────────────────────┐
+  │               FASTAPI BACKEND  (Render)             │
+  │                                                     │
+  │  ┌──────────────────────────────────────────────┐   │
+  │  │              ChatService                     │   │
+  │  │                                              │   │
+  │  │  1. Connectivity probe (_check_internet)     │   │
+  │  │  2. Build retrieval query (query + context)  │   │
+  │  │  3. Embed query → ChromaDB retrieval         │   │
+  │  │  4. Select response mode (grounded/general)  │   │
+  │  │  5. Generate response via Gemini             │   │
+  │  │  6. Return reply + source + latency_ms       │   │
+  │  └───────┬──────────────────────┬───────────────┘   │
+  │          │                      │                   │
+  │          ▼                      ▼                   │
+  │  ┌──────────────┐      ┌─────────────────────┐      │
+  │  │  ChromaDB    │      │  Google Gemini API  │      │
+  │  │  (vectors)   │      │  (generation)       │      │
+  │  └──────────────┘      └─────────────────────┘      │
+  │                                                     │
+  │  On offline: ──────► SQLite offline_protocols       │
+  └─────────────────────────────────────────────────────┘</div>
+
+  <h3>Data flow for a typical request</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>Agent types a question</h4>
+        <p>The web app or extension sends a POST request to <code>/api/chat</code> with the message, recent conversation history, and optional CRM page context.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>Connectivity check</h4>
+        <p>The backend probes <code>generativelanguage.googleapis.com:443</code>. If unreachable, it goes directly to the SQLite offline cache — skipping Gemini entirely.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>Query embedding and retrieval</h4>
+        <p>The query is embedded using <code>gemini-embedding-001</code> and compared against all stored SOP chunks in ChromaDB. The top-4 closest chunks (distance &le; 0.4) are returned.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h4>Response mode selection</h4>
+        <p>The system checks whether the retrieved chunks actually support the query. If yes → GROUNDED mode (uses SOP chunks). If no → GENERAL mode (uses Gemini's broad knowledge, clearly labelled).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h4>Gemini generation</h4>
+        <p>The retrieved chunks, conversation history, and CRM context are injected into the system prompt. Gemini generates a numbered step-by-step response.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <h4>Response returned</h4>
+        <p>The API returns <code>reply</code>, <code>source</code> (rag / general / offline-cache / fallback), <code>latency_ms</code>, and <code>retrieved_sources</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. COMPONENTS -->
+<section id="components">
+  <h2 class="section-title"><span class="num">03</span> System Components</h2>
+  <p class="section-desc">Every part of the system and what it does.</p>
+
+  <table>
+    <tr>
+      <th>Component</th>
+      <th>Technology</th>
+      <th>Location</th>
+      <th>Role</th>
+    </tr>
+    <tr>
+      <td><strong>Web App</strong></td>
+      <td>React + Vite + Tailwind</td>
+      <td><code>webapp/</code></td>
+      <td>Primary user interface — inline chat + side panel</td>
+    </tr>
+    <tr>
+      <td><strong>Chrome Extension</strong></td>
+      <td>MV3 + Vanilla JS</td>
+      <td><code>extension-widget/</code></td>
+      <td>Native Chrome side panel, works on any website</td>
+    </tr>
+    <tr>
+      <td><strong>FastAPI Backend</strong></td>
+      <td>Python 3.11 + FastAPI</td>
+      <td><code>backend/</code></td>
+      <td>RAG orchestration, Gemini calls, offline fallback</td>
+    </tr>
+    <tr>
+      <td><strong>ChatService</strong></td>
+      <td>Python class</td>
+      <td><code>backend/app/services/chat_service.py</code></td>
+      <td>Core logic: connectivity probe, retrieval, generation, retry</td>
+    </tr>
+    <tr>
+      <td><strong>ChromaDB</strong></td>
+      <td>ChromaDB (persistent)</td>
+      <td><code>data/chroma/</code></td>
+      <td>Vector store for SOP and error log embeddings</td>
+    </tr>
+    <tr>
+      <td><strong>Knowledge Base</strong></td>
+      <td>Markdown files</td>
+      <td><code>backend/data/knowledge/</code></td>
+      <td>8 SOP and error log documents (source of truth)</td>
+    </tr>
+    <tr>
+      <td><strong>Offline Cache</strong></td>
+      <td>SQLite</td>
+      <td><code>data/offline_cache/offline.db</code></td>
+      <td>39 pre-cached protocols for zero-internet fallback</td>
+    </tr>
+    <tr>
+      <td><strong>Ingest Script</strong></td>
+      <td>Python</td>
+      <td><code>scripts/ingest_knowledge.py</code></td>
+      <td>Reads .md files → chunks → embeds → stores in ChromaDB</td>
+    </tr>
+    <tr>
+      <td><strong>Evaluation Script</strong></td>
+      <td>Python</td>
+      <td><code>scripts/evaluate_rag.py</code></td>
+      <td>Measures retrieval precision, generation accuracy, latency</td>
+    </tr>
+    <tr>
+      <td><strong>Gemini API</strong></td>
+      <td>Google Generative AI</td>
+      <td>External (Google Cloud)</td>
+      <td>Query embedding + response generation</td>
+    </tr>
+    <tr>
+      <td><strong>Render</strong></td>
+      <td>Cloud hosting</td>
+      <td>External</td>
+      <td>Production backend hosting</td>
+    </tr>
+  </table>
+</section>
+
+<!-- 4. KNOWLEDGE BASE -->
+<section id="knowledge">
+  <h2 class="section-title"><span class="num">04</span> Knowledge Base</h2>
+  <p class="section-desc">The company documents the system is built on.</p>
+
+  <p>The knowledge base lives in <code>backend/data/knowledge/</code> as plain Markdown files. These are the authoritative source of every grounded answer the system gives. When you run the ingest script, these files are chunked, embedded, and stored in ChromaDB as searchable vectors.</p>
+
+  <table>
+    <tr>
+      <th>File</th>
+      <th>Doc ID</th>
+      <th>Coverage</th>
+    </tr>
+    <tr>
+      <td><code>sop_crm_login_access.md</code></td>
+      <td>SOP-001</td>
+      <td>CRM login failures, account lockouts, permission issues, SSO failures, session expiry</td>
+    </tr>
+    <tr>
+      <td><code>sop_call_quality_telephony.md</code></td>
+      <td>SOP-002</td>
+      <td>One-way audio, microphone issues, call drops, echo, routing failures, softphone crashes</td>
+    </tr>
+    <tr>
+      <td><code>sop_system_downtime_offline.md</code></td>
+      <td>SOP-003</td>
+      <td>Outage confirmation, manual interaction logging, telephony backup, restoration procedures</td>
+    </tr>
+    <tr>
+      <td><code>sop_ticket_escalation_routing.md</code></td>
+      <td>SOP-004</td>
+      <td>Tier 1→2→3 escalation rules, routing table, warm/cold transfer, SLA breach prevention</td>
+    </tr>
+    <tr>
+      <td><code>sop_customer_identity_verification.md</code></td>
+      <td>SOP-005</td>
+      <td>Standard 2FA verification, enhanced OTP verification, third-party callers, vulnerable customers</td>
+    </tr>
+    <tr>
+      <td><code>error_log_crm_systems.md</code></td>
+      <td>ERR-001</td>
+      <td>Salesforce INVALID_SESSION_ID, Zendesk 503, Freshdesk auth expiry, record locks, HubSpot 429</td>
+    </tr>
+    <tr>
+      <td><code>error_log_telephony.md</code></td>
+      <td>ERR-002</td>
+      <td>Media stream failed, WebRTC ICE failure, packet loss/jitter, agent status stuck, conference errors</td>
+    </tr>
+    <tr>
+      <td><code>error_log_network_auth.md</code></td>
+      <td>ERR-003</td>
+      <td>VPN auth failure, AD/LDAP sync errors, SSL certificate errors, webhook timeouts, 2FA failures</td>
+    </tr>
+  </table>
+
+  <h3>Adding or updating knowledge</h3>
+  <pre><code>source backend/.venv/bin/activate
+python scripts/ingest_knowledge.py</code></pre>
+
+  <h3>Offline protocols (SQLite)</h3>
+  <p>The <code>data/offline_cache/offline.db</code> table <code>offline_protocols</code> holds 39 pre-written question-answer pairs matched using keyword scoring when Gemini is unreachable.</p>
+  <pre><code>python scripts/seed_offline_db.py</code></pre>
+</section>
+
+<!-- 5. RAG PIPELINE -->
+<section id="rag">
+  <h2 class="section-title"><span class="num">05</span> RAG Pipeline — How Retrieval Works</h2>
+  <p class="section-desc">The step-by-step process from question to retrieved context.</p>
+
+  <h3>What is RAG?</h3>
+  <p>Retrieval-Augmented Generation (RAG) separates <em>knowledge</em> from the language model. Instead of relying on what Gemini memorised during training, the system first retrieves the most relevant passages from your specific documents, then asks Gemini to answer using only those passages — ensuring every answer is traceable to a real source document.</p>
+
+  <h3>Ingestion (one-time setup)</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Read documents</h4><p>The ingest script reads all <code>.md</code> files from <code>backend/data/knowledge/</code>.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Chunk</h4><p>Each document is split into overlapping text chunks so individual procedures can be retrieved without loading the full document.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Embed</h4><p>Each chunk is converted to a vector using <code>gemini-embedding-001</code>. Semantically similar text produces similar vectors.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Store</h4><p>Vectors are stored in ChromaDB at <code>data/chroma/</code> with the source filename as metadata.</p></div></div>
+  </div>
+
+  <h3>Query-time retrieval parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Value</th><th>What it means</th></tr>
+    <tr><td>Embedding model</td><td><code>gemini-embedding-001</code></td><td>Converts the agent's question into a vector</td></tr>
+    <tr><td>Top-K</td><td>4</td><td>Returns the 4 closest document chunks</td></tr>
+    <tr><td>Distance threshold</td><td>0.4</td><td>Chunks further than 0.4 are discarded as irrelevant</td></tr>
+    <tr><td>Context window</td><td>Last 8 turns</td><td>Previous conversation is included in the retrieval query</td></tr>
+    <tr><td>CRM context</td><td>Optional</td><td>Ticket subject/description from the page is added to the query</td></tr>
+  </table>
+
+  <h3>Response mode logic</h3>
+  <ul>
+    <li><strong>GROUNDED</strong> — retrieved chunks match the query → Gemini answers using SOP text → badge: <span class="badge badge-blue">AI · SOP</span></li>
+    <li><strong>GENERAL</strong> — no relevant chunks → Gemini answers from general knowledge, clearly labelled → badge: <span class="badge badge-orange">General guidance</span></li>
+    <li><strong>OFFLINE</strong> — no internet → SQLite keyword match → badge: <span class="badge badge-gray">Offline cache</span></li>
+  </ul>
+</section>
+
+<!-- 6. GEMINI INTEGRATION -->
+<section id="gemini">
+  <h2 class="section-title"><span class="num">06</span> Gemini API Integration</h2>
+  <p class="section-desc">How Google Gemini is used for both embedding and generation.</p>
+
+  <div class="card-grid">
+    <div class="card"><div class="card-icon">🔢</div><h4>Embedding Model</h4><p><code>gemini-embedding-001</code> — converts text into numerical vectors for semantic search.</p></div>
+    <div class="card"><div class="card-icon">💬</div><h4>Generation Model</h4><p><code>gemini-3.1-flash-lite</code> — generates the final answer. Temperature 0.2 keeps responses factual and consistent.</p></div>
+  </div>
+
+  <h3>System prompt behaviour</h3>
+  <ul>
+    <li>Format responses as numbered step-by-step instructions</li>
+    <li>Ask exactly ONE clarifying question if the query is too vague — never multiple questions</li>
+    <li>Never invent company policies or internal contacts not in the retrieved context</li>
+    <li>Use existing conversation turns as context — don't ask for information already provided</li>
+    <li>Clearly label answers as "General guidance" when not backed by a company SOP</li>
+  </ul>
+
+  <h3>Retry logic</h3>
+  <pre><code>Attempt 1: immediate
+Attempt 2: 1.5s delay
+Attempt 3: 3.0s delay
+Network error: skip all retries → SQLite fallback</code></pre>
+</section>
+
+<!-- 7. OFFLINE MODE -->
+<section id="offline">
+  <h2 class="section-title"><span class="num">07</span> Offline Mode &amp; Downtime Resilience</h2>
+  <p class="section-desc">How the system continues working when the network or backend is unavailable.</p>
+
+  <table>
+    <tr><th>Condition</th><th>Behaviour</th><th>Source</th></tr>
+    <tr><td>Backend + Gemini available</td><td>Full RAG pipeline</td><td><span class="badge badge-blue">AI · SOP</span></td></tr>
+    <tr><td>Gemini rate-limited (429/503)</td><td>Retry up to 3 times with backoff</td><td><span class="badge badge-orange">General guidance</span></td></tr>
+    <tr><td>No internet / Gemini unreachable</td><td>SQLite keyword match — 39 protocols</td><td><span class="badge badge-gray">Offline cache</span></td></tr>
+    <tr><td>Offline + no SQLite match</td><td>Polite redirect message</td><td><span class="badge badge-gray">No connection</span></td></tr>
+    <tr><td>Frontend only (no backend)</td><td>Browser-bundled FAQ from <code>offlineFaq.js</code></td><td><span class="badge badge-gray">Offline cache</span></td></tr>
+  </table>
+
+  <h3>Health polling</h3>
+  <p>When offline is detected, the frontend probes <code>GET /api/health</code> every 30 seconds and transparently returns to online mode when the backend responds — no user action required.</p>
+</section>
+
+<!-- 8. USER INTERFACE -->
+<section id="ui">
+  <h2 class="section-title"><span class="num">08</span> User Interface</h2>
+  <p class="section-desc">The three surfaces agents use to interact with the system.</p>
+
+  <div class="card-grid">
+    <div class="card"><div class="card-icon">💻</div><h4>Web App — Main Chat</h4><p>ChatGPT-style full-page experience. Home screen → suggestion chips → scrolling conversation with input pinned at the bottom.</p></div>
+    <div class="card"><div class="card-icon">📌</div><h4>Web App — Side Panel</h4><p>Floating Bubble-logo button (bottom-right) opens a 380px slide-in panel with its own independent conversation thread.</p></div>
+    <div class="card"><div class="card-icon">🔌</div><h4>Chrome Extension</h4><p>Uses Chrome's native Side Panel API. Click the toolbar icon to open the panel alongside any webpage — no page injection.</p></div>
+  </div>
+
+  <h3>Interface features</h3>
+  <table>
+    <tr><th>Feature</th><th>Detail</th></tr>
+    <tr><td>Dark / light mode</td><td>ChatGPT-style palette. Teal accent (#10a37f). Saved to localStorage.</td></tr>
+    <tr><td>Message avatar</td><td>Bubble-logo.png on every AI message in the main chat</td></tr>
+    <tr><td>Typing indicator</td><td>Three animated dots while waiting for response</td></tr>
+    <tr><td>Source badge</td><td>Every AI message shows its source: AI · SOP / Offline cache / No connection</td></tr>
+    <tr><td>Feedback buttons</td><td>👍 👎 on every AI response, sent to <code>POST /api/feedback</code></td></tr>
+    <tr><td>New chat button</td><td>Appears in topbar once a conversation starts</td></tr>
+    <tr><td>Status pill</td><td>Shows Online / Offline live in topbar and sidebar header</td></tr>
+  </table>
+</section>
+
+<!-- 9. API REFERENCE -->
+<section id="api">
+  <h2 class="section-title"><span class="num">09</span> API Reference</h2>
+  <p class="section-desc">All available backend endpoints.</p>
+
+  <p><strong>Base URL (production):</strong> <code>https://assistflow-backend-ctbq.onrender.com</code></p>
+
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/api/health</code></td><td>Liveness check</td></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/api/offline-status</code></td><td>SQLite cache availability and protocol count</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/chat</code></td><td>Main RAG endpoint — auto-falls back offline</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/offline-query</code></td><td>Query SQLite cache directly — no internet needed</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/feedback</code></td><td>Submit thumbs up / thumbs down rating</td></tr>
+  </table>
+
+  <h3>POST /api/chat — Request</h3>
+  <pre><code>{
+  "message": "How do I escalate a ticket to Tier 2?",
+  "conversation": [
+    {"role": "user",      "content": "The customer has called three times"},
+    {"role": "assistant", "content": "Has it been resolved in any of those contacts?"}
+  ],
+  "page_context": {
+    "ticketId":    "TKT-00412",
+    "subject":     "Login failure",
+    "status":      "Open",
+    "priority":    "High",
+    "customer":    "Jane Doe",
+    "description": "Agent cannot log into Salesforce after password change"
+  }
+}</code></pre>
+
+  <h3>POST /api/chat — Response</h3>
+  <pre><code>{
+  "reply":             "Step 1: Before escalating, ensure the ticket contains...",
+  "status":            "ok",
+  "source":            "rag",
+  "latency_ms":        412.3,
+  "retrieved_sources": ["sop_ticket_escalation_routing"]
+}</code></pre>
+</section>
+
+<!-- 10. EVALUATION -->
+<section id="evaluation">
+  <h2 class="section-title"><span class="num">10</span> Performance Evaluation</h2>
+  <p class="section-desc">How the system's performance is formally measured.</p>
+
+  <div class="card-grid">
+    <div class="card"><div class="card-icon">🎯</div><h4>Retrieval Precision</h4><p>Precision@K — did the expected source appear in top-K results? Also reports MRR and per-category breakdown.</p></div>
+    <div class="card"><div class="card-icon">✅</div><h4>Generation Accuracy</h4><p>Phrase coverage — what % of reference key phrases appear in the answer? Reports full match rate and average coverage.</p></div>
+    <div class="card"><div class="card-icon">⚡</div><h4>Latency</h4><p>p50 / p95 / p99 response times for online (full RAG) and simulated downtime (SQLite only) modes.</p></div>
+  </div>
+
+  <h3>Simulated downtime</h3>
+  <p>The downtime evaluation patches <code>_check_internet()</code> to always return <code>False</code>, forcing every request through the SQLite offline cache without a real network outage.</p>
+
+  <pre><code># Full evaluation suite
+python scripts/evaluate_rag.py --mode all --output results.json
+
+# Individual modes
+python scripts/evaluate_rag.py --mode retrieval   # Precision@K + MRR
+python scripts/evaluate_rag.py --mode generation  # Phrase coverage
+python scripts/evaluate_rag.py --mode latency     # Online p50/p95/p99
+python scripts/evaluate_rag.py --mode downtime    # Offline latency simulation</code></pre>
+</section>
+
+<!-- 11. SETUP -->
+<section id="setup">
+  <h2 class="section-title"><span class="num">11</span> Setup &amp; Deployment</h2>
+  <p class="section-desc">How to run the system locally and in production.</p>
+
+  <h3>Prerequisites</h3>
+  <ul>
+    <li>Python 3.11 or newer</li>
+    <li>Node.js 18 or newer</li>
+    <li>Google Gemini API key</li>
+    <li>Google Chrome 114+ (for extension)</li>
+  </ul>
+
+  <h3>Local setup</h3>
+  <pre><code># 1. Clone
+git clone https://github.com/itskramm/AssistFlow-.git
+cd AssistFlow-
+
+# 2. Backend
+cd backend
+cp .env.example .env        # add your GEMINI_API_KEY
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cd ..
+
+# 3. Build knowledge index (once)
+python scripts/ingest_knowledge.py
+
+# 4. Start backend
+cd backend && python run.py
+
+# 5. Start web app (new terminal)
+cd webapp && npm install && npm run dev</code></pre>
+
+  <h3>Production deployment</h3>
+  <table>
+    <tr><th>Layer</th><th>Platform</th><th>URL / Path</th></tr>
+    <tr><td>Backend</td><td>Render (free tier)</td><td><code>https://assistflow-backend-ctbq.onrender.com</code></td></tr>
+    <tr><td>Web app</td><td>Vercel</td><td>Configured via <code>webapp/vercel.json</code></td></tr>
+    <tr><td>Extension</td><td>Load unpacked / Chrome Web Store</td><td><code>extension-widget/</code></td></tr>
+  </table>
+
+  <h3>Required environment variables</h3>
+  <pre><code>GEMINI_API_KEY=your_key_here
+CHROMA_DB_PATH=/opt/render/project/src/data/chroma
+KNOWLEDGE_DIR=/opt/render/project/src/data/knowledge
+OFFLINE_DB_PATH=/opt/render/project/src/data/offline_cache/offline.db</code></pre>
+</section>
+
+<!-- 12. TECH STACK -->
+<section id="stack">
+  <h2 class="section-title"><span class="num">12</span> Technology Stack</h2>
+  <p class="section-desc">Every library, service, and tool the system depends on.</p>
+
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Version / Notes</th></tr>
+    <tr><td>Frontend framework</td><td>React</td><td>18 · Vite build</td></tr>
+    <tr><td>Frontend styling</td><td>Tailwind CSS + custom CSS variables</td><td>ChatGPT-style teal palette</td></tr>
+    <tr><td>Backend framework</td><td>FastAPI</td><td>Python 3.11+</td></tr>
+    <tr><td>ASGI server</td><td>Uvicorn</td><td>Production via Render</td></tr>
+    <tr><td>LLM</td><td>Google Gemini 3.1 Flash Lite</td><td>Via LangChain Google GenAI</td></tr>
+    <tr><td>Embedding model</td><td>gemini-embedding-001</td><td>768-dimensional vectors</td></tr>
+    <tr><td>Vector database</td><td>ChromaDB</td><td>Persistent local client</td></tr>
+    <tr><td>Offline cache</td><td>SQLite</td><td>39 pre-cached protocols</td></tr>
+    <tr><td>LLM orchestration</td><td>LangChain</td><td>langchain-google-genai</td></tr>
+    <tr><td>Extension platform</td><td>Chrome Manifest V3</td><td>Native Side Panel API</td></tr>
+    <tr><td>Backend hosting</td><td>Render</td><td>Free tier web service</td></tr>
+    <tr><td>Frontend hosting</td><td>Vercel</td><td>Auto-deploy from GitHub</td></tr>
+    <tr><td>Version control</td><td>Git + GitHub</td><td>github.com/itskramm/AssistFlow-</td></tr>
+  </table>
+</section>
+
+<!-- Footer -->
+<div style="border-top:1px solid var(--border);margin-top:64px;padding-top:24px;text-align:center;color:var(--muted);font-size:12px;">
+  SmartOpsSupportHub &nbsp;·&nbsp; AI-Assisted Workplace Support System &nbsp;·&nbsp; 2026 &nbsp;·&nbsp; Thesis Project
+</div>
+
+</body>
+</html>
