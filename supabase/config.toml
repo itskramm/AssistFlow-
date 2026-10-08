@@ -238,11 +238,6 @@ enable_confirmations = true
 secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "60s"
-# Number of characters used in the email OTP.
-otp_length = 6
-# Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
-
 # Use Supabase's default email provider. It is restricted to authorized
 # project/team addresses and has strict rate limits.
 [auth.email.smtp]

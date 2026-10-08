@@ -15,9 +15,6 @@ const BACKEND_URL      = import.meta.env.VITE_BACKEND_URL || 'https://assistflow
 const FETCH_TIMEOUT_MS = 15000;
 const HEALTH_POLL_MS   = 30000;
 const PROMPT_HISTORY_LIMIT = 50;
-const OTP_LENGTH       = 6;
-const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
-const EMAIL_RESEND_COOLDOWN_KEY = 'assistflow-email-resend-cooldown';
 const INACTIVITY_TIMEOUT_MS = 60 * 1000;
 const MINIMUM_AGE = 18;
 
@@ -128,16 +125,6 @@ function getPasswordStrength(value) {
   return 'weak';
 }
 
-function getEmailCooldown(email) {
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(EMAIL_RESEND_COOLDOWN_KEY) || '{}');
-    const expiresAt = Number(stored[email.trim().toLowerCase()]);
-    return Number.isFinite(expiresAt) ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)) : 0;
-  } catch {
-    return 0;
-  }
-}
-
 function PasswordField({ id, label, value, onChange, autoComplete, placeholder, onPaste }) {
   const [visible, setVisible] = useState(false);
   return (
@@ -191,17 +178,6 @@ function PasswordRequirements({ password }) {
       </ul>
     </div>
   );
-}
-
-function setEmailCooldown(email) {
-  try {
-    const key = email.trim().toLowerCase();
-    const stored = JSON.parse(window.localStorage.getItem(EMAIL_RESEND_COOLDOWN_KEY) || '{}');
-    stored[key] = Date.now() + EMAIL_RESEND_COOLDOWN_SECONDS * 1000;
-    window.localStorage.setItem(EMAIL_RESEND_COOLDOWN_KEY, JSON.stringify(stored));
-  } catch {
-    // The in-memory cooldown still protects the current page if storage is unavailable.
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -354,26 +330,13 @@ function LoginScreen() {
   const [accessType, setAccessType] = useState('User');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [otp, setOtp] = useState('');
   const [rememberMe, setRememberMePreference] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [awaitingOtp, setAwaitingOtp] = useState(false);
-  const [otpPurpose, setOtpPurpose] = useState('signup');
-  const [awaitingResetPassword, setAwaitingResetPassword] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
   const isSignUp = mode === 'signup';
   const isForgotPassword = mode === 'forgot';
   const maximumBirthDate = getMaximumBirthDate();
-
-  useEffect(() => {
-    if (!resendCooldown) return undefined;
-    const timer = window.setInterval(() => {
-      setResendCooldown(previous => Math.max(0, previous - 1));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [resendCooldown]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -388,18 +351,13 @@ function LoginScreen() {
       setError('');
       setNotice('');
       setIsSubmitting(true);
-      const { error: resetError } = await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: { shouldCreateUser: false },
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: window.location.origin,
       });
       if (resetError) {
         setError(resetError.message);
       } else {
-        setOtpPurpose('recovery');
-        setAwaitingOtp(true);
-        setEmailCooldown(trimmedEmail);
-        setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
-        setNotice('If an account exists for this email, a verification code has been sent.');
+        setNotice('If an account exists for this email, a password reset link has been sent.');
       }
       setIsSubmitting(false);
       return;
@@ -475,16 +433,11 @@ function LoginScreen() {
       } else if (data.user?.identities?.length === 0) {
         setError('Email already registered. Please use a different email address or reset your password.');
       } else if (!data.session) {
-        setAwaitingOtp(true);
-        setEmailCooldown(trimmedEmail);
-        setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
-        setNotice('We sent a verification code to your email.');
+        setNotice('Account created. Check your email and click the confirmation link to finish signing in.');
         setPassword('');
         setConfirmPassword('');
       } else {
-        await supabase.auth.signOut();
-        setMode('login');
-        setNotice('Account Created Successfully! Please sign in with your new credentials.');
+        setNotice('Account created successfully. You are signed in.');
         setPassword('');
         setConfirmPassword('');
       }
@@ -516,11 +469,6 @@ function LoginScreen() {
     setBirthday('');
     setAddress('');
     setAccessType('User');
-    setOtp('');
-    setAwaitingOtp(false);
-    setOtpPurpose('signup');
-    setAwaitingResetPassword(false);
-    setResendCooldown(0);
   };
 
   const switchTo = nextMode => {
@@ -529,103 +477,28 @@ function LoginScreen() {
     setNotice('');
     setPassword('');
     setConfirmPassword('');
-    setOtp('');
-    setAwaitingOtp(false);
-    setOtpPurpose('signup');
-    setAwaitingResetPassword(false);
   };
 
-  const verifyEmailOtp = async (event) => {
-    event.preventDefault();
-    const trimmedOtp = otp.trim();
-    if (!supabase || !trimmedOtp) {
-      setError('Enter the 6-digit verification code from your email.');
-      return;
-    }
-    if (!new RegExp(`^\\d{${OTP_LENGTH}}$`).test(trimmedOtp)) {
-      setError('The verification code must contain exactly 6 digits.');
-      return;
-    }
-
-    setError('');
-    setIsSubmitting(true);
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: trimmedOtp,
-      type: otpPurpose === 'signup' ? 'signup' : 'email',
-    });
-    if (verifyError) {
-      setError(verifyError.message);
-    } else if (otpPurpose === 'recovery') {
-      setAwaitingOtp(false);
-      setAwaitingResetPassword(true);
-      setNotice('Code verified. Choose a new password.');
-    } else {
-      await supabase.auth.signOut();
-      setAwaitingOtp(false);
-      setNotice('Account Created Successfully! Your email is verified. Please sign in.');
-      setMode('login');
-      setPassword('');
-      setOtp('');
-    }
-    setIsSubmitting(false);
-  };
-
-  const resendEmailOtp = async () => {
-    if (!supabase || !email.trim()) return;
-    const remainingCooldown = Math.max(resendCooldown, getEmailCooldown(email));
-    if (remainingCooldown > 0) {
-      setResendCooldown(remainingCooldown);
-      setError(`Please wait ${remainingCooldown} seconds before requesting another code.`);
+  const sendMagicLink = async () => {
+    const trimmedEmail = email.trim();
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Enter a valid email address before requesting a magic link.');
       return;
     }
     setError('');
     setNotice('');
     setIsSubmitting(true);
-    const resendResult = otpPurpose === 'signup'
-      ? await supabase.auth.resend({ type: 'signup', email: email.trim() })
-      : await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { shouldCreateUser: false },
-      });
-    const resendError = resendResult.error;
-    if (resendError) {
-      const providerMessage = resendError.message?.toLowerCase() || '';
-      if (providerMessage.includes('rate limit') || providerMessage.includes('too many')) {
-        setError('Email delivery is temporarily rate-limited. Please wait 60 seconds before trying again.');
-      } else {
-        setError(resendError.message);
-      }
+    const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+      email: trimmedEmail,
+      options: {
+        emailRedirectTo: window.location.origin,
+        shouldCreateUser: false,
+      },
+    });
+    if (magicLinkError) {
+      setError(magicLinkError.message);
     } else {
-      setNotice('A new verification code was sent.');
-    }
-    setEmailCooldown(email);
-    setResendCooldown(EMAIL_RESEND_COOLDOWN_SECONDS);
-    setIsSubmitting(false);
-  };
-
-  const resetPasswordWithOtp = async event => {
-    event.preventDefault();
-    if (!isValidPassword(password)) {
-      setError('Password must be 8–16 characters and include uppercase, lowercase, number, and special character.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    setError('');
-    setIsSubmitting(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) {
-      setError(updateError.message);
-    } else {
-      await supabase.auth.signOut();
-      setAwaitingResetPassword(false);
-      setMode('login');
-      setPassword('');
-      setConfirmPassword('');
-      setNotice('Password reset successfully. Please sign in again.');
+      setNotice('If an account exists for this email, a magic link has been sent.');
     }
     setIsSubmitting(false);
   };
@@ -651,65 +524,6 @@ function LoginScreen() {
             Supabase is not configured. Add the VITE_SUPABASE_URL and
             VITE_SUPABASE_ANON_KEY environment variables.
           </p>
-        ) : awaitingOtp ? (
-          <form className="login-form" onSubmit={verifyEmailOtp}>
-            <label htmlFor="login-otp">
-              {otpPurpose === 'signup' ? '6-digit email verification code' : '6-digit password reset code'}
-            </label>
-            <input
-              id="login-otp"
-              type="text"
-              value={otp}
-              onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH))}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern={`\\d{${OTP_LENGTH}}`}
-              minLength={OTP_LENGTH}
-              maxLength={OTP_LENGTH}
-              required
-              placeholder="Enter 6 digits"
-              autoFocus
-            />
-            {error && <p className="login-error" role="alert">{error}</p>}
-            <button className="login-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Verifying…' : 'Verify email'}
-            </button>
-            <p className="login-switch">
-              Didn’t receive it?{' '}
-              <button type="button" onClick={resendEmailOtp} disabled={isSubmitting || resendCooldown > 0}>
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
-              </button>{' '}
-              or{' '}
-              <button type="button" onClick={() => setAwaitingOtp(false)}>
-                Back to sign up
-              </button>
-            </p>
-          </form>
-        ) : awaitingResetPassword ? (
-          <form className="login-form" onSubmit={resetPasswordWithOtp}>
-            <PasswordField
-              id="forgot-new-password"
-              label="New password"
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              autoComplete="new-password"
-              placeholder="Enter a new password"
-            />
-            <PasswordRequirements password={password} />
-            <PasswordField
-              id="forgot-confirm-password"
-              label="Confirm new password"
-              value={confirmPassword}
-              onChange={event => setConfirmPassword(event.target.value)}
-              autoComplete="new-password"
-              placeholder="Re-enter the new password"
-              onPaste={event => event.preventDefault()}
-            />
-            {error && <p className="login-error" role="alert">{error}</p>}
-            <button className="login-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save new password'}
-            </button>
-          </form>
         ) : (
           <form className="login-form" onSubmit={handleSubmit}>
             {isSignUp && (
@@ -822,14 +636,24 @@ function LoginScreen() {
               {isSubmitting ? 'Please wait…' : isSignUp ? 'Create account' : isForgotPassword ? 'Send reset link' : 'Sign in'}
             </button>
             {!isSignUp && !isForgotPassword && (
-              <label className="remember-me">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={event => setRememberMePreference(event.target.checked)}
-                />
-                Remember me
-              </label>
+              <>
+                <label className="remember-me">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={event => setRememberMePreference(event.target.checked)}
+                  />
+                  Remember me
+                </label>
+                <button
+                  className="login-magic-link"
+                  type="button"
+                  onClick={sendMagicLink}
+                  disabled={isSubmitting}
+                >
+                  Email me a magic link
+                </button>
+              </>
             )}
             <p className="login-switch">
               {isForgotPassword ? (

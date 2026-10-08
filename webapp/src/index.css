@@ -319,6 +319,26 @@ html, body, #root {
   accent-color: var(--accent);
 }
 
+.login-magic-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.login-magic-link:hover:not(:disabled) {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.login-magic-link:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .login-switch {
   margin: 18px 0 0;
   color: var(--text-muted);

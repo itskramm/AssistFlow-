@@ -10,7 +10,7 @@ Standalone web version of the AssistFlow Chrome extension. This provides the sam
 - **Real-time AI assistance** via the FastAPI backend
 - **Auto-recovery** from offline mode
 - **Dark mode** support
-- **Supabase email/password login and sign-up** with email OTP verification
+- **Supabase email/password login and sign-up** with email magic-link verification
 - **Supabase profiles** with an account dropdown in the main page
 - **Per-user conversation history** — complete saved chats, responses, source labels, and ratings are restored after sign-in
 - **Left-side conversation history** — browse saved chats and reopen every exchange in a conversation
@@ -54,11 +54,11 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
 ```
 
 The app displays the login/sign-up page until a valid Supabase session exists.
-New users receive an email verification OTP after signup. In the Supabase
-dashboard, keep email confirmation enabled, set the email OTP length to
-**6 digits**, and configure the Confirm signup email template to include
-`{{ .Token }}`. The website accepts exactly six numeric digits and verifies
-the code with `supabase.auth.verifyOtp({ type: 'signup' })`.
+New users receive an email confirmation magic link after signup. The website
+does not ask users to copy or enter a one-time code; clicking the link returns
+to the application and completes the Supabase confirmation session. The login
+page also offers a passwordless magic-link option, while password login remains
+available.
 You can also use the Supabase dashboard's Authentication → Users page to
 create accounts directly.
 
